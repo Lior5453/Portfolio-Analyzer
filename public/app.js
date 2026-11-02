@@ -128,7 +128,7 @@ function applyTypeMode() {
   form.quantity.required = !cash;
   form.price.required = !cash;
   $("#name-label").textContent = cash ? "שם" : "שם הנכס / סימול";
-  form.name.placeholder = cash ? "לדוגמה: עו״ש, פיקדון, מזומן בדולרים" : "לדוגמה: AAPL, TEVA.TA, BTC-USD";
+  form.name.placeholder = cash ? "לדוגמה: עו״ש, פיקדון, קופה" : "לדוגמה: AAPL, TEVA.TA, BTC-USD";
   form.name.dir = cash ? "auto" : "ltr";
   if (cash) {
     // No market lookup for cash
@@ -455,13 +455,14 @@ function renderComparison() {
 
   // Headline: how the portfolio did vs. each benchmark
   const mine = finals.portfolio;
+  // e.g. "יותר מ-SPY (+6.9%)" - each benchmark's own return is shown next to it
   const verdicts = ["SPY", "QQQM"].map((k) => {
     const diff = mine - finals[k];
-    const word = Math.abs(diff) < 0.0005 ? "בדיוק כמו" : diff > 0 ? `טוב יותר ב-${Math.abs(diff * 100).toFixed(1)} נק׳ אחוז מ` : `פחות טוב ב-${Math.abs(diff * 100).toFixed(1)} נק׳ אחוז מ`;
-    return `${word}-${k}`;
+    const word = Math.abs(diff) < 0.0005 ? "בדיוק כמו" : diff > 0 ? "יותר מ" : "פחות מ";
+    return `${word}-${k} (${signedPct(finals[k])})`;
   });
   $("#compare-summary").innerHTML =
-    `${RANGE_LABELS[data.range]} התיק שלך השיג <strong>${signedPct(mine)}</strong> – ${verdicts.join(", ")}.`;
+    `${RANGE_LABELS[data.range]} התיק שלך השיג <strong>${signedPct(mine)}</strong> – ${verdicts[0]} ו${verdicts[1]}.`;
 
   // Scales
   const all = data.series.flatMap((s) => s.returns);
@@ -522,7 +523,7 @@ function renderComparison() {
       <span class="val">${money.format(data.start_value * (1 + finals[s.key]))}</span></li>`).join("");
 
   let note = `ההשוואה מניחה שהתיק הנוכחי הוחזק לאורך כל התקופה, ושאותו סכום (${money.format(data.start_value)}) הושקע כולו ב-SPY או ב-QQQM. כולל דיבידנדים ושער הדולר, בשקלים.`;
-  if (data.flat_symbols.length) note += ` ללא נתונים היסטוריים, נחשבו בערך קבוע: ${data.flat_symbols.join(", ")}.`;
+  if (data.flat_symbols.length) note += ` נכסים ללא נתונים היסטוריים נחשבו בערך קבוע: ${data.flat_symbols.join(", ")}.`;
   $("#compare-note").textContent = note;
 }
 
@@ -627,7 +628,7 @@ function exchangeHtml(question, answer) {
 function updateHistoryHead() {
   $("#history-head").hidden = turnCount === 0;
   $("#history-count").textContent =
-    `השיחה נשמרת · האנליסט זוכר את ${Math.min(turnCount, contextTurns)}/${contextTurns} ההתכתבויות האחרונות`;
+    `השיחה נשמרת · האנליסט זוכר עד ${contextTurns} התכתבויות אחרונות (כרגע: ${Math.min(turnCount, contextTurns)})`;
 }
 
 // Groups role-based messages into question/answer pairs for display

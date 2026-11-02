@@ -1,6 +1,6 @@
 # Portfolio Analyzer
 
-A web app for tracking and analyzing a personal investment portfolio: enter your holdings, see the allocation in a chart, and ask an analyst powered by **Google Gemini AI** questions about your portfolio.
+A web app for tracking and analyzing a personal investment portfolio: enter your holdings, see the allocation in a chart, compare your performance against 100% SPY / QQQM, and ask an analyst powered by **Google Gemini AI** questions about your portfolio.
 
 ![App screenshot](docs/screenshot.png)
 
@@ -16,13 +16,20 @@ A web app for tracking and analyzing a personal investment portfolio: enter your
 
 ### 🍩 Portfolio allocation chart
 - A donut chart showing the **portfolio allocation in percentages**, with the total value in the center.
-- Two views: **by asset** or **by asset type** (stocks, bonds, crypto...).
+- Two views: **by asset** or **by asset type**.
 - A holdings table with quantity, price, value and percentage of the portfolio, including edit and delete.
 - Holdings are saved in a local **SQLite database**, so they persist across refreshes, browsers and server restarts.
 
+### 🏷️ Asset types
+- Supported types: **stocks, bonds, ETFs, mutual funds, crypto, cash** and **other**. The type is used for the "by type" view and by the analyst to assess risk and diversification.
+- **Automatic detection:** when a symbol is found, the type is pre-selected from Yahoo's classification (stock, ETF, mutual fund, crypto). It can still be changed manually.
+- **Bond funds** such as `BND`, `AGG` or `TLT` are ETFs that hold bonds, so they are detected as ETFs - change the type to "bonds" manually.
+- **Cash** has its own form: a free-text name (e.g. a bank account) and a single amount in ILS, with no market lookup.
+- Assets that are not on Yahoo (e.g. Israeli mutual funds) can be added with a manually entered price.
+
 ### 📊 Performance comparison vs. SPY / QQQM
 - A **"Compare"** view in the chart card answers: *would I have done better with 100% in SPY or 100% in QQQM?*
-- A line chart of cumulative returns for **your portfolio**, **100% SPY** and **100% QQQM**, over **1 month, 6 months, 1 year or 5 years**, with a one-line verdict (e.g. *"+6.1% - 0.8 pp worse than SPY, 1.6 pp better than QQQM"*).
+- A line chart of cumulative returns for **your portfolio**, **100% SPY** and **100% QQQM**, over **1 month, 6 months, 1 year or 5 years**, with a one-line summary (e.g. *"In the last year your portfolio returned +6.1% - less than SPY (+6.9%) and more than QQQM (+4.5%)"*).
 - Hover the chart to see all three returns on any date.
 - How it is calculated: the **current holdings** are assumed to be held for the whole period, and the same starting amount is put entirely into SPY or QQQM. Prices come from Yahoo Finance history, are **dividend-adjusted** (total return) and converted to **ILS** with the historical exchange rate. Assets with no price history (e.g. cash) keep a constant value.
 - This is a backtest of today's allocation, not your actual profit (purchase dates and prices are not tracked yet).
@@ -77,7 +84,10 @@ python server.py
 
 Then open http://localhost:8000 in your browser.
 
-> Without an API key the app works as usual (prices and chart); only the analyst is unavailable.
+> Without an API key the app works as usual (prices, charts and comparison); only the analyst is unavailable.
+
+- **Another port:** set the `PORT` environment variable (e.g. `PORT=8001 python server.py`).
+- **After changing `server.py`**, stop the server (Ctrl+C) and start it again. Changes to files in `public/` only need a browser refresh (Ctrl+Shift+R).
 
 ---
 
