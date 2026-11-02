@@ -55,7 +55,7 @@ const I18N = {
     other: "אחר",
 
     // Performance comparison
-    comparePerformance: "ביצועים",
+    comparePerformance: "השוואה",
     timeRange: "טווח זמן",
     range1mo: "חודש",
     range6mo: "6 חודשים",
@@ -233,9 +233,9 @@ const typeLabel = (type) => TYPE_LABELS[type]?.[currentLang] ?? type;
 // Cash holdings have free-text names, usually in Hebrew. In English they are shown with
 // a matching English name; the stored name never changes.
 const CASH_NAMES_EN = {
-  'עו"ש': "ILS cash",
-  "עו״ש": "ILS cash",
-  "עובר ושב": "ILS cash",
+  'עו"ש': "Checking account",
+  "עו״ש": "Checking account",
+  "עובר ושב": "Checking account",
   "מזומן": "ILS cash",
   "פיקדון": "ILS deposit",
   "פקדון": "ILS deposit",
