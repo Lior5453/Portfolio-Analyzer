@@ -116,8 +116,10 @@ body {
 /* Form */
 .field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; flex: 1; }
 .row { display: flex; gap: 12px; }
+.row .field { min-width: 0; }
 label { font-size: 0.85rem; color: var(--text-secondary); }
 input, select {
+  width: 100%; min-width: 0; /* fill the field and shrink with narrow columns */
   font: inherit;
   padding: 8px 10px;
   border: 1px solid var(--border);
@@ -163,7 +165,10 @@ tfoot td { font-weight: 600; border-bottom: none; }
 
 /* Chart */
 .chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
-.chart-head h2 { margin: 0; }
+/* Title and view buttons always stay on one line */
+.chart-head h2 { margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chart-head .toggle { flex: none; }
+.chart-head .toggle button { white-space: nowrap; padding: 6px 8px; font-size: 0.8rem; }
 .toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .toggle button {
   background: none; border: none; border-radius: 0;

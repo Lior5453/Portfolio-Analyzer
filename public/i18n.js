@@ -44,7 +44,7 @@ const I18N = {
     delete: "מחיקה",
 
     // Allocation chart
-    allocation: "חלוקת התיק",
+    allocation: "חלוקה",
     chartView: "תצוגת הגרף",
     byAsset: "לפי נכס",
     byType: "לפי סוג",
@@ -54,7 +54,7 @@ const I18N = {
     other: "אחר",
 
     // Performance comparison
-    comparePerformance: "השוואת ביצועים",
+    comparePerformance: "ביצועים",
     timeRange: "טווח זמן",
     range1mo: "חודש",
     range6mo: "6 חודשים",
@@ -140,7 +140,7 @@ const I18N = {
     edit: "Edit",
     delete: "Delete",
 
-    allocation: "Portfolio allocation",
+    allocation: "Allocation",
     chartView: "Chart view",
     byAsset: "By asset",
     byType: "By type",
@@ -149,7 +149,7 @@ const I18N = {
     portfolioValue: "Portfolio value",
     other: "Other",
 
-    comparePerformance: "Performance comparison",
+    comparePerformance: "Returns",
     timeRange: "Time range",
     range1mo: "1 month",
     range6mo: "6 months",
