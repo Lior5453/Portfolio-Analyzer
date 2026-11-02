@@ -1,6 +1,6 @@
 # Portfolio Analyzer
 
-A web app for tracking and analyzing a personal investment portfolio: enter your holdings, see the allocation in a chart, compare your performance against 100% SPY / QQQM, and ask an analyst powered by **Google Gemini AI** questions about your portfolio.
+A web app for tracking and analyzing a personal investment portfolio: enter your holdings, see the allocation in a chart, compare your performance against 100% SPY / QQQM, and ask an analyst powered by **Google Gemini AI** questions about your portfolio. Available in **Hebrew and English**, with amounts in **shekels or dollars**.
 
 ![App screenshot](docs/screenshot.png)
 
@@ -11,32 +11,37 @@ A web app for tracking and analyzing a personal investment portfolio: enter your
 ### 📈 Real-time prices
 - Prices for stocks, ETFs, crypto and more are fetched **in real time from the Yahoo Finance API** (`query1.finance.yahoo.com`).
 - Any Yahoo symbol is supported: US stocks (`AAPL`, `SPY`), Tel Aviv Stock Exchange (`TEVA.TA`), crypto (`BTC-USD`) and more.
-- **Automatic conversion to ILS (₪)** using the latest exchange rate (also from Yahoo). TASE shares priced in agorot are converted to shekels.
+- **Automatic conversion to ILS (₪)** using the latest exchange rate (also from Yahoo). TASE shares priced in agorot are converted to shekels. Prices are stored in ILS and can be displayed in USD (see below).
 - 60-second server-side cache to avoid overloading the data source.
+
+### 🧩 Layout
+- Three columns side by side on wide screens: **holdings** (add an asset + table), **chart**, and **the analyst**.
+- Medium screens: holdings and chart side by side, the analyst below at full width. Phones: one column.
 
 ### 🍩 Portfolio allocation chart
 - A donut chart showing the **portfolio allocation in percentages**, with the total value in the center.
-- Two views: **by asset** or **by asset type**.
-- A holdings table with quantity, price, value and percentage of the portfolio, including edit and delete.
+- Three views, each with its own title: **Asset allocation** (by asset), **Type allocation** (by asset type) and **Compare** (see below). The title and view buttons stay in place when switching.
+- A holdings table with quantity, price, value and percentage of the portfolio, including edit and delete. Cash rows show only their value.
 - Holdings are saved in a local **SQLite database**, so they persist across refreshes, browsers and server restarts.
 
 ### 🏷️ Asset types
 - Supported types: **stocks, bonds, ETFs, mutual funds, crypto, cash** and **other**. The type is used for the "by type" view and by the analyst to assess risk and diversification.
 - **Automatic detection:** when a symbol is found, the type is pre-selected from Yahoo's classification (stock, ETF, mutual fund, crypto). It can still be changed manually.
 - **Bond funds** such as `BND`, `AGG` or `TLT` are ETFs that hold bonds, so they are detected as ETFs - change the type to "bonds" manually.
-- **Cash** has its own form: a free-text name (e.g. a bank account) and a single amount in ILS, with no market lookup.
+- **Cash** has its own form: a free-text name (e.g. a bank account) and a single amount in the selected currency, with no market lookup. It is stored in ILS.
 - Assets that are not on Yahoo (e.g. Israeli mutual funds) can be added with a manually entered price.
 
 ### 📊 Performance comparison vs. SPY / QQQM
 - A **"Compare"** view in the chart card answers: *would I have done better with 100% in SPY or 100% in QQQM?*
-- A line chart of cumulative returns for **your portfolio**, **100% SPY** and **100% QQQM**, over **1 month, 6 months, 1 year or 5 years**, with a one-line summary (e.g. *"In the last year your portfolio returned +6.1% - less than SPY (+6.9%) and more than QQQM (+4.5%)"*).
+- A line chart of cumulative returns for **your portfolio**, **100% SPY** and **100% QQQM**, over **1 month, 6 months, 1 year or 5 years**, with a one-line summary (e.g. *"Over the last year, your portfolio returned +6.1% – less than SPY (+6.9%) and more than QQQM (+4.5%)."*).
 - Hover the chart to see all three returns on any date.
-- How it is calculated: the **current holdings** are assumed to be held for the whole period, and the same starting amount is put entirely into SPY or QQQM. Prices come from Yahoo Finance history, are **dividend-adjusted** (total return) and converted to **ILS** with the historical exchange rate. Assets with no price history (e.g. cash) keep a constant value.
+- How it is calculated: the **current holdings** are assumed to be held for the whole period, and the same starting amount is put entirely into SPY or QQQM. Prices come from Yahoo Finance history, are **dividend-adjusted** (total return) and calculated in the **selected currency** (ILS or USD) with the historical exchange rate - so the returns are what an investor in that currency would see. Assets with no price history (e.g. cash) keep a constant ILS value.
 - This is a backtest of today's allocation, not your actual profit (purchase dates and prices are not tracked yet).
 
 ### 🤖 The Analyst - powered by Gemini AI
 - The "Analyst" panel lets you ask free-form questions about your portfolio, or pick a preset question (e.g. *"Is my portfolio too risky?"*, *"How can I improve diversification?"*).
-- **Portfolio data is attached automatically to every question**: the server summarizes the holdings, values and allocation by type, and sends them to Gemini together with the question.
+- **Portfolio data is attached automatically to every question**: the server summarizes the holdings, values and allocation by type (in the selected currency), and sends them to Gemini together with the question.
+- The analyst answers in the **selected language** (Hebrew or English).
 - The analyst addresses diversification, risk level, currency exposure and liquidity, and ends with practical recommendations.
 - If the primary model (`gemini-3.5-flash`) is overloaded, the server automatically falls back to a backup model (`gemini-3.5-flash-lite`).
 - **Chat history with a smart context window** - see below.
@@ -55,6 +60,14 @@ A web app for tracking and analyzing a personal investment portfolio: enter your
 - Everything is translated: labels, buttons, messages, asset types, chart and comparison texts, number and date formats.
 - **The analyst answers in the selected language.**
 - The choice is remembered in the browser. Asset types are stored in one form in the database and only translated for display, so switching never affects saved data.
+- Hebrew cash names are shown in English too (e.g. "עו״ש" → "Checking account"); the stored name does not change.
+
+### 💱 Shekels / dollars
+- A **₪ / $ switch** under the language switcher shows every amount in **shekels or dollars**: the table, the chart, the totals, the form, price lookups and the comparison.
+- Dollar amounts use the **live USD/ILS rate** from Yahoo Finance (hover the $ button to see it).
+- In dollar mode, prices and cash amounts are **entered in dollars** and converted to shekels when saved; values typed in the form are converted when switching.
+- The **comparison is recalculated in the selected currency**, since returns differ between a shekel and a dollar investor when the exchange rate moves.
+- The analyst gets the portfolio values in the selected currency. The choice is remembered in the browser.
 
 ---
 
@@ -62,7 +75,7 @@ A web app for tracking and analyzing a personal investment portfolio: enter your
 
 1. **Add an asset** - enter a symbol (e.g. `AAPL`) and the number of units. The price **and the asset type** (stock, ETF, mutual fund, crypto) are filled in automatically from the market; you can still change them or enter a price manually. For **cash**, choose the "Cash" type: the form switches to a free-text name (e.g. a bank account) and a single **amount** field.
 2. **View the portfolio** - the chart and table update immediately. Switch between the "by asset" and "by type" views, or open **"Compare"** to see how the portfolio did against 100% SPY / QQQM.
-3. **Switch language** - click the Israeli or US flag at the top of the page.
+3. **Switch language or currency** - click the Israeli or US flag, or ₪ / $, at the top of the page.
 4. **Ask the analyst** - type a question (e.g. *"I'm 30 and investing long-term - what should I change?"*) and click **Ask the Analyst**.
 
 ---
@@ -110,14 +123,14 @@ A **"Default Portfolio"** is created automatically on first run. `unit_price` is
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/api/quote?symbol=AAPL` | Live price from Yahoo Finance, converted to ILS, plus the asset class (`instrumentType`) |
-| `GET` | `/api/compare?range=1y` | Portfolio vs. 100% SPY / 100% QQQM returns (`1mo`, `6mo`, `1y`, `5y`) |
+| `GET` | `/api/quote?symbol=AAPL` | Live price from Yahoo Finance, converted to ILS, plus the asset class (`instrumentType`). Also used for the USD/ILS rate (`USDILS=X`) |
+| `GET` | `/api/compare?range=1y&currency=ILS` | Portfolio vs. 100% SPY / 100% QQQM returns (`range`: `1mo`, `6mo`, `1y`, `5y`; `currency`: `ILS`, `USD`) |
 | `GET` | `/api/portfolio` | The portfolio and its holdings |
 | `POST` | `/api/holdings` | Add a holding |
 | `PUT` | `/api/holdings/<id>` | Update a holding |
 | `DELETE` | `/api/holdings/<id>` | Delete a holding |
 | `POST` | `/api/holdings/import` | One-time import of browser-saved holdings (only if the portfolio is empty) |
-| `POST` | `/api/analyze` | Ask the analyst (`{"question": "..."}`) |
+| `POST` | `/api/analyze` | Ask the analyst (`{"question": "...", "lang": "he", "currency": "ILS"}`) |
 | `GET` | `/api/history?limit=100` | Recent chat messages |
 | `DELETE` | `/api/history` | Clear the chat history |
 | `GET` | `/api/status` | Whether the analyst (API key) is available |
@@ -128,9 +141,9 @@ A **"Default Portfolio"** is created automatically on first run. `unit_price` is
 Portfolio-Analyzer/
 ├── public/              # Front end (the only folder served to the browser)
 │   ├── index.html       # Page structure
-│   ├── styles.css       # Styling (dark mode)
+│   ├── styles.css       # Styling (light and dark mode)
 │   ├── i18n.js          # Hebrew / English translations and language switching
-│   └── app.js           # Client-side logic: holdings, charts, API calls
+│   └── app.js           # Client-side logic: holdings, charts, currency, API calls
 ├── docs/
 │   └── screenshot.png   # Screenshot used in this README
 ├── data/                # Created at runtime - SQLite database portfolio.db (not committed)

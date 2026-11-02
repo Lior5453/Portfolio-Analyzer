@@ -22,6 +22,7 @@
       <p class="subtitle" data-i18n="subtitle">הזן את האחזקות שלך וראה איך התיק מחולק</p>
     </div>
 
+    <div class="header-controls">
     <!-- Language switcher (Hebrew / English) -->
     <div class="toggle lang-switch" role="group" aria-label="שפה" data-i18n-aria="language">
       <button type="button" data-lang="he" lang="he" aria-pressed="true">
@@ -59,6 +60,17 @@
         <span>English</span>
       </button>
     </div>
+
+    <!-- Display currency (shekel / dollar); prices are stored in shekels -->
+    <div class="toggle currency-switch" role="group" aria-label="מטבע" data-i18n-aria="currency">
+      <button type="button" data-currency="ILS" aria-pressed="true">
+        <span class="cur-sign" aria-hidden="true">₪</span><span data-i18n="currencyILS">שקל</span>
+      </button>
+      <button type="button" data-currency="USD" aria-pressed="false">
+        <span class="cur-sign" aria-hidden="true">$</span><span data-i18n="currencyUSD">דולר</span>
+      </button>
+    </div>
+    </div>
   </header>
 
   <main class="layout">
@@ -86,7 +98,7 @@
         </div>
         <!-- Cash: a single amount instead of quantity × price -->
         <div class="field" id="amount-field" hidden>
-          <label for="amount" data-i18n="amount">סכום (₪)</label>
+          <label for="amount" id="amount-label">סכום (₪)</label>
           <input id="amount" name="amount" type="number" min="0" step="any" placeholder="50000">
         </div>
         <div class="row" id="units-row">
@@ -95,7 +107,7 @@
             <input id="quantity" name="quantity" type="number" min="0" step="any" required placeholder="10">
           </div>
           <div class="field">
-            <label for="price" data-i18n="unitPrice">מחיר ליחידה (₪)</label>
+            <label for="price" id="price-label">מחיר ליחידה (₪)</label>
             <input id="price" name="price" type="number" min="0" step="any" required placeholder="150">
           </div>
         </div>

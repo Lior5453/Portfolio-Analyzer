@@ -3,7 +3,8 @@
 Serves the site's static files (public/) and adds API endpoints:
   GET    /api/status               whether the analyst (Gemini API key) is available
   GET    /api/quote?symbol=AAPL    current market price (Yahoo Finance) and the price in ILS
-  GET    /api/compare?range=1y     portfolio performance vs. 100% SPY / 100% QQQM (1mo, 6mo, 1y, 5y)
+  GET    /api/compare?range=1y&currency=ILS   portfolio performance vs. 100% SPY / 100% QQQM
+                                     (range: 1mo, 6mo, 1y, 5y; currency: ILS or USD)
   GET    /api/portfolio            the default portfolio and its holdings
   POST   /api/holdings             add a holding
   PUT    /api/holdings/<id>        update a holding
@@ -252,6 +253,28 @@ def clear_chat_history():
 
 
 # ======================================================================
+# Display currency
+# ======================================================================
+# Prices are stored in ILS. The UI can show them in ILS or USD; USD values use the live rate.
+CURRENCIES = {"ILS": "₪", "USD": "$"}
+USD_ILS_SYMBOL = "USDILS=X"  # Yahoo symbol for the dollar / shekel exchange rate
+
+
+def parse_currency(value):
+    return value if value in CURRENCIES else "ILS"
+
+
+def ils_per_unit(currency):
+    """How many shekels one unit of the display currency is worth (1 for ILS)."""
+    if currency == "ILS":
+        return 1.0
+    meta = fetch_meta(USD_ILS_SYMBOL)
+    if not meta:
+        raise RuntimeError("no USD/ILS exchange rate")
+    return float(meta["regularMarketPrice"])
+
+
+# ======================================================================
 # Analyst (Google Gemini)
 # ======================================================================
 # The model can be changed via GEMINI_MODEL in the .env file.
@@ -291,21 +314,25 @@ def has_api_key():
     return bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
 
 
-def portfolio_summary(holdings):
-    """Turns the holdings list into structured text sent to Gemini (not shown to the user)."""
+def portfolio_summary(holdings, currency="ILS"):
+    """Turns the holdings list into structured text sent to Gemini (not shown to the user).
+
+    Amounts are shown in the display currency the user selected.
+    """
+    sign, rate = CURRENCIES[currency], ils_per_unit(currency)
     rows, total = [], 0.0
     for h in holdings:
-        qty, price = float(h["quantity"]), float(h["unit_price"])
+        qty, price = float(h["quantity"]), float(h["unit_price"]) / rate
         value = qty * price
         total += value
         rows.append((h["symbol"], h["asset_type"], qty, price, value))
     if not rows:
         return "The portfolio is currently empty - it has no assets."
 
-    lines = [f"Total value: ₪{total:,.2f}", "", "Holdings:"]
+    lines = [f"Currency: {currency}", f"Total value: {sign}{total:,.2f}", "", "Holdings:"]
     for symbol, asset_type, qty, price, value in sorted(rows, key=lambda r: -r[4]):
         share = value / total * 100 if total else 0
-        lines.append(f"- {symbol} | type: {asset_type} | quantity: {qty:g} | unit price: ₪{price:,.2f} | value: ₪{value:,.2f} | {share:.1f}% of portfolio")
+        lines.append(f"- {symbol} | type: {asset_type} | quantity: {qty:g} | unit price: {sign}{price:,.2f} | value: {sign}{value:,.2f} | {share:.1f}% of portfolio")
 
     by_type = {}
     for _, asset_type, _, _, value in rows:
@@ -313,7 +340,7 @@ def portfolio_summary(holdings):
     lines += ["", "Allocation by asset type:"]
     for asset_type, value in sorted(by_type.items(), key=lambda kv: -kv[1]):
         share = value / total * 100 if total else 0
-        lines.append(f"- {asset_type}: {share:.1f}% (₪{value:,.2f})")
+        lines.append(f"- {asset_type}: {share:.1f}% ({sign}{value:,.2f})")
     return "\n".join(lines)
 
 
@@ -321,7 +348,7 @@ def portfolio_summary(holdings):
 ANSWER_LANGUAGES = {"he": "Hebrew", "en": "English"}
 
 
-def build_contents(question, holdings, context_messages):
+def build_contents(question, holdings, context_messages, currency="ILS"):
     """Builds the Gemini request: the context window, then the new question with the current portfolio."""
     contents = []
     for message in context_messages:
@@ -329,15 +356,15 @@ def build_contents(question, holdings, context_messages):
         text = message["content"] or (DEFAULT_QUESTION if role == "user" else "")
         contents.append(genai_types.Content(role=role, parts=[genai_types.Part(text=text)]))
     contents.append(genai_types.Content(role="user", parts=[genai_types.Part(text=(
-        f"<portfolio>\n{portfolio_summary(holdings)}\n</portfolio>\n\n"
+        f"<portfolio>\n{portfolio_summary(holdings, currency)}\n</portfolio>\n\n"
         f"<question>\n{question or DEFAULT_QUESTION}\n</question>"
     ))]))
     return contents
 
 
-def analyze(question, holdings, context_messages, lang="he"):
+def analyze(question, holdings, context_messages, lang="he", currency="ILS"):
     """Asks Gemini. Returns the answer text, or None if the response was blocked or empty."""
-    contents = build_contents(question, holdings, context_messages)
+    contents = build_contents(question, holdings, context_messages, currency)
     config = genai_types.GenerateContentConfig(
         system_instruction=ANALYST_SYSTEM.replace("{language}", ANSWER_LANGUAGES.get(lang, "Hebrew")),
         max_output_tokens=16000,
@@ -499,11 +526,13 @@ def history_in_ils(symbol, range_key, grid):
     return prices
 
 
-def compare_portfolio(holdings, range_key):
+def compare_portfolio(holdings, range_key, currency="ILS"):
     """Compares the current portfolio, held over the whole period, with 100% in each benchmark.
 
-    All values are in ILS. Returns cumulative returns (0.05 = +5%) per grid time.
-    Holdings with no Yahoo history (e.g. cash or manual assets) keep a constant value.
+    Values are calculated in the display currency (ILS or USD), using the historical exchange
+    rate, so the returns are what an investor in that currency would see.
+    Returns cumulative returns (0.05 = +5%) per grid time.
+    Holdings with no Yahoo history (e.g. cash or manual assets) keep a constant ILS value.
     """
     # The first benchmark's trading days form the shared time grid.
     base = fetch_history(BENCHMARKS[0], range_key)
@@ -521,18 +550,33 @@ def compare_portfolio(holdings, range_key):
         for i, p in enumerate(prices):
             portfolio_values[i] += h["quantity"] * p
 
+    # ILS -> display currency, per grid time
+    if currency == "ILS":
+        rates = [1.0] * len(grid)
+    else:
+        fx = fetch_history(USD_ILS_SYMBOL, range_key)
+        if not fx:
+            raise RuntimeError("no USD/ILS exchange rate history")
+        rates = values_on_grid(fx["times"], fx["prices"], grid)
+
+    def in_currency(values):
+        return [v / r for v, r in zip(values, rates)]
+
     def cumulative_returns(values):
         start = values[0]
         return [round(v / start - 1, 6) if start else 0.0 for v in values]
 
+    portfolio_values = in_currency(portfolio_values)
     series = [{"key": "portfolio", "returns": cumulative_returns(portfolio_values)}]
     for symbol in BENCHMARKS:
-        series.append({"key": symbol, "returns": cumulative_returns(history_in_ils(symbol, range_key, grid))})
+        benchmark = in_currency(history_in_ils(symbol, range_key, grid))
+        series.append({"key": symbol, "returns": cumulative_returns(benchmark)})
 
     return {
         "range": range_key,
         "times": grid,
         "series": series,
+        "currency": currency,
         "start_value": round(portfolio_values[0], 2),
         "end_value": round(portfolio_values[-1], 2),
         "flat_symbols": flat_symbols,
@@ -655,14 +699,16 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_json(200, data)
 
     def handle_compare(self, parsed):
-        range_key = urllib.parse.parse_qs(parsed.query).get("range", ["1y"])[0]
+        params = urllib.parse.parse_qs(parsed.query)
+        range_key = params.get("range", ["1y"])[0]
+        currency = parse_currency(params.get("currency", ["ILS"])[0])
         if range_key not in COMPARE_RANGES:
             raise BadRequest(f"range must be one of: {', '.join(COMPARE_RANGES)}")
         holdings = list_holdings()
         if not holdings:
             return self.send_json(409, {"error": "empty_portfolio"})
         try:
-            data = compare_portfolio(holdings, range_key)
+            data = compare_portfolio(holdings, range_key, currency)
         except Exception as e:  # network / data source error
             print(f"[compare] failed: {type(e).__name__}: {e}")
             return self.send_json(502, {"error": "data_unavailable"})
@@ -674,11 +720,12 @@ class Handler(SimpleHTTPRequestHandler):
         body = self.read_json()
         question = str(body.get("question", "")).strip()[:4000]
         lang = body.get("lang") if body.get("lang") in ANSWER_LANGUAGES else "he"
+        currency = parse_currency(body.get("currency"))
         # The portfolio and the context window are read from the database (the source of truth).
         holdings = list_holdings()
         context_messages = get_context_window()
         try:
-            answer = analyze(question, holdings, context_messages, lang)
+            answer = analyze(question, holdings, context_messages, lang, currency)
         except genai_errors.APIError as e:
             if e.code in (400, 401, 403) and "key" in str(e).lower():
                 return self.send_json(401, {"error": "bad_api_key"})

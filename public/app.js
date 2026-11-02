@@ -8,7 +8,11 @@ const state = {
   holdings: [],
   groupBy: "name",
   editingId: null,
+  // Display currency. Prices are stored in ILS; USD amounts are converted with the live rate.
+  currency: "ILS",
+  usdIls: null, // shekels per dollar
 };
+const CURRENCY_STORAGE_KEY = "portfolio-currency";
 
 const $ = (sel) => document.querySelector(sel);
 const form = $("#holding-form");
@@ -16,11 +20,21 @@ const tbody = $("#holdings-table tbody");
 const svg = $("#donut");
 const tooltip = $("#tooltip");
 
-// Number formatters follow the current language (rebuilt when it changes)
-let money, money2, number;
+// ILS <-> display currency
+const toDisplay = (ils) => (state.currency === "USD" ? ils / state.usdIls : ils);
+const fromDisplay = (amount) => (state.currency === "USD" ? amount * state.usdIls : amount);
+const currencySign = () => (state.currency === "USD" ? "$" : "₪");
+
+// Number formatters follow the current language and currency (rebuilt when either changes).
+// money / money2 take an ILS amount and show it in the display currency;
+// moneyRaw shows an amount that is already in the display currency.
+let money, money2, moneyRaw, number;
 function makeFormatters() {
-  money = new Intl.NumberFormat(locale(), { style: "currency", currency: "ILS", maximumFractionDigits: 0 });
-  money2 = new Intl.NumberFormat(locale(), { style: "currency", currency: "ILS", maximumFractionDigits: 2 });
+  const whole = new Intl.NumberFormat(locale(), { style: "currency", currency: state.currency, maximumFractionDigits: 0 });
+  const cents = new Intl.NumberFormat(locale(), { style: "currency", currency: state.currency, maximumFractionDigits: 2 });
+  money = { format: (ils) => whole.format(toDisplay(ils)) };
+  money2 = { format: (ils) => cents.format(toDisplay(ils)) };
+  moneyRaw = whole;
   number = new Intl.NumberFormat(locale(), { maximumFractionDigits: 4 });
 }
 applyStaticTranslations();
@@ -78,9 +92,10 @@ form.addEventListener("submit", async (e) => {
     // Cash names are free text (e.g. a bank account), so they keep their original case
     name: cash ? data.get("name").trim() : data.get("name").trim().toUpperCase(),
     type: data.get("type"),
-    // Cash is stored as quantity = amount, unit price = ₪1
-    quantity: parseFloat(data.get(cash ? "amount" : "quantity")),
-    price: cash ? 1 : parseFloat(data.get("price")),
+    // Amounts are entered in the display currency and stored in ILS.
+    // Cash is stored as quantity = amount in ILS, unit price = ₪1.
+    quantity: cash ? fromDisplay(parseFloat(data.get("amount"))) : parseFloat(data.get("quantity")),
+    price: cash ? 1 : fromDisplay(parseFloat(data.get("price"))),
   };
   if (!holding.name || !(holding.quantity >= 0) || !(holding.price >= 0)) return;
 
@@ -166,7 +181,7 @@ async function lookupPrice() {
     const q = await res.json();
     if (seq !== quoteSeq) return;
 
-    form.price.value = +q.priceILS.toFixed(2);
+    form.price.value = +toDisplay(q.priceILS).toFixed(2);
     form.price.classList.add("auto-filled");
     // Pre-select the asset type from Yahoo's classification (the user can still change it)
     const detectedType = TYPE_BY_INSTRUMENT[q.instrumentType];
@@ -174,7 +189,7 @@ async function lookupPrice() {
       form.type.value = detectedType;
       form.type.classList.add("auto-filled");
     }
-    const original = q.currency === "ILS" ? "" :
+    const original = q.currency === state.currency ? "" :
       ` (${new Intl.NumberFormat(locale(), { style: "currency", currency: q.currency }).format(q.price)})`;
     setQuoteStatus(`${q.name}: ${money2.format(q.priceILS)}${original}${detectedType ? ` · ${typeLabel(detectedType)}` : ""}`, "ok");
   } catch {
@@ -216,8 +231,8 @@ function startEdit(id) {
   form.type.classList.remove("auto-filled");
   applyTypeMode();
   form.quantity.value = h.quantity;
-  form.price.value = h.price;
-  form.amount.value = +(h.quantity * h.price).toFixed(2);
+  form.price.value = +toDisplay(h.price).toFixed(2);
+  form.amount.value = +toDisplay(h.quantity * h.price).toFixed(2);
   updateSubmitLabel();
   $("#cancel-edit").hidden = false;
   form.name.focus();
@@ -291,8 +306,8 @@ function renderTable() {
     tr.innerHTML = `
       <td><span class="swatch" style="background:${colorForHolding(h, list)}"></span><span class="n"></span></td>
       <td class="t"></td>
-      <td class="num">${number.format(h.quantity)}</td>
-      <td class="num">${money.format(h.price)}</td>
+      <td class="num">${h.type === CASH_TYPE ? "—" : number.format(h.quantity)}</td>
+      <td class="num">${h.type === CASH_TYPE ? "—" : money2.format(h.price)}</td>
       <td class="num">${money.format(v)}</td>
       <td class="num">${sum ? pct(v / sum) : "—"}</td>
       <td><div class="row-actions">
@@ -449,13 +464,13 @@ async function loadComparison() {
     summary.textContent = t("compareEmpty");
     return;
   }
-  const cacheKey = range + holdingsKey();
+  const cacheKey = range + state.currency + holdingsKey();
   let data = compareState.cache[cacheKey];
   if (!data) {
     summary.textContent = t("compareLoading");
     compareSvg.classList.add("loading");
     try {
-      data = await api("GET", `/api/compare?range=${range}`);
+      data = await api("GET", `/api/compare?range=${range}&currency=${state.currency}`);
       compareState.cache[cacheKey] = data;
     } catch {
       if (seq === compareState.seq) summary.textContent = t("compareFailed");
@@ -540,9 +555,9 @@ function renderComparison() {
     <li><span class="swatch line-swatch" style="background:${COMPARE_SERIES[s.key].color}"></span>
       <span class="label">${seriesLabel(s.key)}</span>
       <span class="pct">${signedPct(finals[s.key])}</span>
-      <span class="val">${money.format(data.start_value * (1 + finals[s.key]))}</span></li>`).join("");
+      <span class="val">${moneyRaw.format(data.start_value * (1 + finals[s.key]))}</span></li>`).join("");
 
-  let note = t("compareNote", money.format(data.start_value));
+  let note = t("compareNote", moneyRaw.format(data.start_value), data.currency);
   if (data.flat_symbols.length) {
     const names = data.flat_symbols.map((name) => {
       const h = state.holdings.find((x) => x.name === name);
@@ -699,7 +714,7 @@ async function askAnalyst(question) {
       headers: { "Content-Type": "application/json" },
       // The server reads the portfolio from the database, so only the question is sent
       // The answer language follows the page language
-      body: JSON.stringify({ question, lang: currentLang }),
+      body: JSON.stringify({ question, lang: currentLang, currency: state.currency }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(t("analystErrors")[data.error] || t("analystGeneric"));
@@ -755,6 +770,10 @@ document.querySelectorAll(".lang-switch button").forEach((btn) => {
 
 // Updates the text that app.js builds itself (static text is handled by i18n.js)
 function refreshDynamicText() {
+  $("#price-label").textContent = `${t("unitPrice")} (${currencySign()})`;
+  $("#amount-label").textContent = `${t("amount")} (${currencySign()})`;
+  // Hovering the $ button shows the exchange rate in use
+  if (state.usdIls) $(".currency-switch [data-currency=USD]").title = t("rateTitle", state.usdIls.toFixed(3));
   updateSubmitLabel();
   updateChartTitle();
   applyTypeMode();
@@ -770,7 +789,38 @@ document.addEventListener("langchange", () => {
   if (!$("#compare").hidden && compareState.data) renderComparison();
 });
 
+// ---------- Currency switch ----------
+async function loadUsdRate() {
+  const q = await api("GET", "/api/quote?symbol=USDILS%3DX");
+  state.usdIls = q.priceILS;
+}
+
+async function setCurrency(currency) {
+  if (currency === state.currency) return;
+  if (currency === "USD") {
+    try { await loadUsdRate(); }
+    catch { setQuoteStatus(t("fxFailed"), "error"); return; }
+  }
+  // Keep whatever is typed in the form: convert it to the new currency
+  const typed = [form.price, form.amount].map((input) => [input, parseFloat(input.value)]);
+  typed.forEach(([input, v]) => { if (!isNaN(v)) input.value = fromDisplay(v); });
+  state.currency = currency;
+  typed.forEach(([input, v]) => { if (!isNaN(v)) input.value = +toDisplay(+input.value).toFixed(2); });
+
+  try { localStorage.setItem(CURRENCY_STORAGE_KEY, currency); } catch {}
+  document.querySelectorAll(".currency-switch button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.currency === currency));
+  makeFormatters();
+  refreshDynamicText();
+  render(); // also reloads the comparison if it is open
+}
+
+document.querySelectorAll(".currency-switch button").forEach((btn) => {
+  btn.addEventListener("click", () => setCurrency(btn.dataset.currency));
+});
+
 refreshDynamicText();
 render();
+// Restore the saved currency (needs the exchange rate first)
+try { if (localStorage.getItem(CURRENCY_STORAGE_KEY) === "USD") setCurrency("USD"); } catch {}
 loadPortfolio();
 loadHistory();

@@ -8,6 +8,11 @@ const I18N = {
     pageTitle: "תיק ההשקעות שלי",
     subtitle: "הזן את האחזקות שלך וראה איך התיק מחולק",
     language: "שפה",
+    currency: "מטבע",
+    currencyILS: "שקל",
+    currencyUSD: "דולר",
+    fxFailed: "לא הצלחתי לטעון את שער הדולר כרגע. מציג בשקלים.",
+    rateTitle: (rate) => `שער נוכחי: $1 = ₪${rate}`,
 
     // Holdings form
     addAsset: "הוספת נכס",
@@ -16,9 +21,9 @@ const I18N = {
     cashNameLabel: "שם",
     cashNamePlaceholder: "לדוגמה: עו״ש, פיקדון, קופה",
     assetType: "סוג נכס",
-    amount: "סכום (₪)",
+    amount: "סכום",
     quantity: "כמות יחידות",
-    unitPrice: "מחיר ליחידה (₪)",
+    unitPrice: "מחיר ליחידה",
     addToPortfolio: "הוסף לתיק",
     saveChanges: "שמור שינויים",
     cancelEdit: "ביטול עריכה",
@@ -72,8 +77,8 @@ const I18N = {
     verdictLess: (k, v) => `פחות מ-${k} (${v})`,
     verdictSame: (k, v) => `בדיוק כמו ${k} (${v})`,
     compareSummary: (range, mine, a, b) => `${range} התיק שלך השיג <strong>${mine}</strong> – ${a} ו${b}.`,
-    compareNote: (amount) =>
-      `ההשוואה מניחה שהתיק הנוכחי הוחזק לאורך כל התקופה, ושאותו סכום (${amount}) הושקע כולו ב-SPY או ב-QQQM. כולל דיבידנדים ושער הדולר, בשקלים.`,
+    compareNote: (amount, currency) =>
+      `ההשוואה מניחה שהתיק הנוכחי הוחזק לאורך כל התקופה, ושאותו סכום (${amount}) הושקע כולו ב-SPY או ב-QQQM. כולל דיבידנדים ושער הדולר, ${currency === "USD" ? "בדולרים" : "בשקלים"}.`,
     compareFlat: (list) => ` נכסים ללא נתונים היסטוריים נחשבו בערך קבוע: ${list}.`,
 
     // Analyst
@@ -108,6 +113,11 @@ const I18N = {
     pageTitle: "My Investment Portfolio",
     subtitle: "Enter your holdings and see how your portfolio is allocated",
     language: "Language",
+    currency: "Currency",
+    currencyILS: "Shekel",
+    currencyUSD: "Dollar",
+    fxFailed: "Couldn't load the dollar exchange rate right now. Showing shekels.",
+    rateTitle: (rate) => `Current rate: $1 = ₪${rate}`,
 
     addAsset: "Add an asset",
     nameLabel: "Asset name / symbol",
@@ -115,9 +125,9 @@ const I18N = {
     cashNameLabel: "Name",
     cashNamePlaceholder: "e.g. checking account, deposit, savings",
     assetType: "Asset type",
-    amount: "Amount (₪)",
+    amount: "Amount",
     quantity: "Quantity",
-    unitPrice: "Price per unit (₪)",
+    unitPrice: "Price per unit",
     addToPortfolio: "Add to portfolio",
     saveChanges: "Save changes",
     cancelEdit: "Cancel",
@@ -168,8 +178,8 @@ const I18N = {
     verdictLess: (k, v) => `less than ${k} (${v})`,
     verdictSame: (k, v) => `the same as ${k} (${v})`,
     compareSummary: (range, mine, a, b) => `${range}, your portfolio returned <strong>${mine}</strong> – ${a} and ${b}.`,
-    compareNote: (amount) =>
-      `This comparison assumes the current portfolio was held for the whole period, and that the same amount (${amount}) was invested entirely in SPY or QQQM. Includes dividends and the dollar exchange rate, in ILS.`,
+    compareNote: (amount, currency) =>
+      `This comparison assumes the current portfolio was held for the whole period, and that the same amount (${amount}) was invested entirely in SPY or QQQM. Includes dividends and the dollar exchange rate, in ${currency}.`,
     compareFlat: (list) => ` Assets without price history were kept at a constant value: ${list}.`,
 
     analyst: "The Analyst",
