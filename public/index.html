@@ -116,7 +116,12 @@
         <button type="submit" class="btn-primary" id="ask-btn">שאל את האנליסט</button>
       </form>
 
-      <div class="answer" id="answer" aria-live="polite" hidden></div>
+      <!-- Conversation memory: last exchanges saved in the server database -->
+      <div class="history-head" id="history-head" hidden>
+        <span id="history-count"></span>
+        <button type="button" class="icon-btn delete" id="clear-history">נקה שיחה</button>
+      </div>
+      <div class="thread" id="thread" aria-live="polite"></div>
       <p class="disclaimer">הניתוח נוצר על ידי בינה מלאכותית, לצורכי לימוד בלבד, ואינו מהווה ייעוץ השקעות.</p>
     </section>
     </div>
