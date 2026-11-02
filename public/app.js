@@ -315,6 +315,7 @@ function renderTable() {
         <button type="button" class="icon-btn delete" data-del="${h.id}">${t("delete")}</button>
       </div></td>`;
     tr.querySelector(".n").textContent = holdingName(h.name, h.type);
+    tr.querySelector(".n").title = holdingName(h.name, h.type); // full name on hover, if it is cut
     tr.querySelector(".t").textContent = typeLabel(h.type);
     tbody.appendChild(tr);
   }

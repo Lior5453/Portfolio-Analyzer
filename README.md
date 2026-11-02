@@ -16,7 +16,8 @@ A web app for tracking and analyzing a personal investment portfolio: enter your
 
 ### 🧩 Layout
 - Three columns side by side on wide screens: **holdings** (add an asset + table), **chart**, and **the analyst**.
-- Medium screens: holdings and chart side by side, the analyst below at full width. Phones: one column.
+- Medium screens: holdings and chart side by side, the analyst below at full width.
+- Phones: one column with a compact holdings table (quantity and price are hidden and shown when editing); long asset names are shortened with "…", and the page never scrolls sideways.
 
 ### 🍩 Portfolio allocation chart
 - A donut chart showing the **portfolio allocation in percentages**, with the total value in the center.

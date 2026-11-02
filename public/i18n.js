@@ -3,6 +3,10 @@
 const LANG_STORAGE_KEY = "portfolio-lang";
 const LANGS = { he: { dir: "rtl", locale: "he-IL" }, en: { dir: "ltr", locale: "en-US" } };
 
+// Wraps text such as "SPY (+6.3%)" or "−7.7%" as one left-to-right unit, so it is not
+// reordered inside Hebrew (right-to-left) sentences
+const ltr = (text) => `<bdi dir="ltr">${text}</bdi>`;
+
 const I18N = {
   he: {
     pageTitle: "תיק ההשקעות שלי",
@@ -73,10 +77,10 @@ const I18N = {
     compareLoading: "טוען נתוני מחירים היסטוריים…",
     compareFailed: "לא הצלחתי לטעון נתונים היסטוריים כרגע. נסה שוב בעוד רגע.",
     rangeSentence: { "1mo": "בחודש האחרון", "6mo": "ב-6 החודשים האחרונים", "1y": "בשנה האחרונה", "5y": "ב-5 השנים האחרונות" },
-    verdictMore: (k, v) => `יותר מ-${k} (${v})`,
-    verdictLess: (k, v) => `פחות מ-${k} (${v})`,
-    verdictSame: (k, v) => `בדיוק כמו ${k} (${v})`,
-    compareSummary: (range, mine, a, b) => `${range} התיק שלך השיג <strong>${mine}</strong> – ${a} ו${b}.`,
+    verdictMore: (k, v) => `יותר מ-${ltr(`${k} (${v})`)}`,
+    verdictLess: (k, v) => `פחות מ-${ltr(`${k} (${v})`)}`,
+    verdictSame: (k, v) => `בדיוק כמו ${ltr(`${k} (${v})`)}`,
+    compareSummary: (range, mine, a, b) => `${range} התיק שלך השיג <strong>${ltr(mine)}</strong> – ${a} ו${b}.`,
     compareNote: (amount, currency) =>
       `ההשוואה מניחה שהתיק הנוכחי הוחזק לאורך כל התקופה, ושאותו סכום (${amount}) הושקע כולו ב-SPY או ב-QQQM. כולל דיבידנדים ושער הדולר, ${currency === "USD" ? "בדולרים" : "בשקלים"}.`,
     compareFlat: (list) => ` נכסים ללא נתונים היסטוריים נחשבו בערך קבוע: ${list}.`,
@@ -174,10 +178,10 @@ const I18N = {
     compareLoading: "Loading historical prices…",
     compareFailed: "Couldn't load historical data right now. Please try again in a moment.",
     rangeSentence: { "1mo": "Over the last month", "6mo": "Over the last 6 months", "1y": "Over the last year", "5y": "Over the last 5 years" },
-    verdictMore: (k, v) => `more than ${k} (${v})`,
-    verdictLess: (k, v) => `less than ${k} (${v})`,
-    verdictSame: (k, v) => `the same as ${k} (${v})`,
-    compareSummary: (range, mine, a, b) => `${range}, your portfolio returned <strong>${mine}</strong> – ${a} and ${b}.`,
+    verdictMore: (k, v) => `more than ${ltr(`${k} (${v})`)}`,
+    verdictLess: (k, v) => `less than ${ltr(`${k} (${v})`)}`,
+    verdictSame: (k, v) => `the same as ${ltr(`${k} (${v})`)}`,
+    compareSummary: (range, mine, a, b) => `${range}, your portfolio returned <strong>${ltr(mine)}</strong> – ${a} and ${b}.`,
     compareNote: (amount, currency) =>
       `This comparison assumes the current portfolio was held for the whole period, and that the same amount (${amount}) was invested entirely in SPY or QQQM. Includes dividends and the dollar exchange rate, in ${currency}.`,
     compareFlat: (list) => ` Assets without price history were kept at a constant value: ${list}.`,

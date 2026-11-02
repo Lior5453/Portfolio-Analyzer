@@ -160,7 +160,10 @@ button { font: inherit; cursor: pointer; border-radius: 8px; }
 }
 
 /* Table */
-.table-wrap { overflow-x: auto; }
+/* position: relative keeps hidden labels inside the scroll area (otherwise they widen the whole page on phones) */
+.table-wrap { overflow-x: auto; position: relative; }
+/* Long asset names are cut with an ellipsis; the full name shows on hover */
+#holdings-table .n { display: inline-block; max-width: 14em; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 th, td { padding: 8px 6px; text-align: start; border-bottom: 1px solid var(--border); white-space: nowrap; }
 th { color: var(--text-muted); font-weight: 500; font-size: 0.8rem; }
@@ -175,7 +178,21 @@ tfoot td { font-weight: 600; border-bottom: none; }
 .icon-btn:hover { color: var(--text-primary); background: var(--bg); }
 .icon-btn.delete:hover { color: var(--danger); }
 .empty { color: var(--text-muted); text-align: center; padding: 16px 0; margin: 0; }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+
+/* Phones: hide quantity and price (shown when editing), and tighten the table */
+@media (max-width: 600px) {
+  .card { padding: 14px 10px; }
+  #holdings-table tr > :nth-child(3), #holdings-table tr > :nth-child(4) { display: none; }
+  #holdings-table th, #holdings-table td { padding: 8px 3px; font-size: 0.85rem; }
+  #holdings-table .n { max-width: 6em; }
+  #holdings-table td:nth-child(2) { white-space: normal; } /* long type names wrap */
+  #holdings-table .row-actions { flex-direction: column; align-items: flex-end; gap: 0; }
+  .icon-btn { padding: 2px 3px; }
+}
 
 /* Chart */
 /* Title on its own row, view buttons below it, so nothing moves when switching views */
