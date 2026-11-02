@@ -63,7 +63,7 @@
 
   <main class="layout">
     <!-- Part 1: portfolio holdings entry -->
-    <section class="card" aria-labelledby="form-title">
+    <section class="card holdings-card" aria-labelledby="form-title">
       <h2 id="form-title" data-i18n="addAsset">הוספת נכס</h2>
       <form id="holding-form" autocomplete="off">
         <div class="field">
@@ -133,9 +133,8 @@
       </div>
     </section>
 
-    <div class="side-col">
     <!-- Part 2: portfolio allocation chart -->
-    <section class="card" aria-labelledby="chart-title">
+    <section class="card chart-card" aria-labelledby="chart-title">
       <div class="chart-head">
         <h2 id="chart-title">חלוקת התיק</h2>
         <div class="toggle view-toggle" role="group" aria-label="תצוגת הגרף" data-i18n-aria="chartView">
@@ -174,7 +173,7 @@
     </section>
 
     <!-- Part 3: analyst (Google Gemini) -->
-    <section class="card analyst" aria-labelledby="analyst-title">
+    <section class="card analyst analyst-card" aria-labelledby="analyst-title">
       <h2 id="analyst-title" data-i18n="analyst">האנליסט</h2>
       <p class="analyst-intro" data-i18n="analystIntro">שאל שאלה על התיק. נתוני התיק מצורפים לשאלה אוטומטית.</p>
 
@@ -198,7 +197,6 @@
       <div class="thread" id="thread" aria-live="polite"></div>
       <p class="disclaimer" data-i18n="disclaimer">הניתוח נוצר על ידי בינה מלאכותית, לצורכי לימוד בלבד, ואינו מהווה ייעוץ השקעות.</p>
     </section>
-    </div>
   </main>
 
   <script src="i18n.js"></script>
