@@ -1,9 +1,10 @@
 // Investment portfolio - holdings entry and allocation chart
-const STORAGE_KEY = "portfolio-holdings";
+// Holdings are stored on the server (SQLite) and loaded through the /api/portfolio endpoints.
+const LEGACY_STORAGE_KEY = "portfolio-holdings"; // used by older versions that saved holdings in the browser
 const MAX_SLICES = 8; // beyond this, the smallest assets are grouped into "Other"
 
 const state = {
-  holdings: load(),
+  holdings: [],
   groupBy: "name",
   editingId: null,
 };
@@ -19,23 +20,53 @@ const money2 = new Intl.NumberFormat("he-IL", { style: "currency", currency: "IL
 const number = new Intl.NumberFormat("he-IL", { maximumFractionDigits: 4 });
 const pct = (v) => (v * 100).toFixed(1) + "%";
 
-function load() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+// ---------- Server API (holdings) ----------
+// The server uses symbol / asset_type / unit_price; the UI uses name / type / price.
+const fromApi = (h) => ({ id: String(h.id), name: h.symbol, type: h.asset_type, quantity: h.quantity, price: h.unit_price });
+const toApi = (h) => ({ symbol: h.name, asset_type: h.type, quantity: h.quantity, unit_price: h.price });
+
+async function api(method, url, body) {
+  const res = await fetch(url, {
+    method,
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { status: res.status, data });
+  return data;
+}
+
+// Reads holdings saved in the browser by older versions (before the database), if any
+function readLegacyHoldings() {
+  try { return JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY)) || []; }
   catch { return []; }
 }
-function save() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state.holdings)); } catch {}
+
+async function loadPortfolio() {
+  try {
+    let portfolio = await api("GET", "/api/portfolio");
+    // One-time migration: move browser-saved holdings into the database
+    const legacy = readLegacyHoldings();
+    if (!portfolio.holdings.length && legacy.length) {
+      const result = await api("POST", "/api/holdings/import", { holdings: legacy.map(toApi) });
+      portfolio = result.portfolio;
+    }
+    if (legacy.length) { try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch {} }
+    state.holdings = portfolio.holdings.map(fromApi);
+  } catch {
+    setQuoteStatus("לא הצלחתי לטעון את התיק מהשרת. נסה לרענן את הדף.", "error");
+  }
+  render();
 }
 
 const valueOf = (h) => h.quantity * h.price;
 const total = () => state.holdings.reduce((s, h) => s + valueOf(h), 0);
 
 // ---------- Form ----------
-form.addEventListener("submit", (e) => {
+form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const data = new FormData(form);
   const holding = {
-    id: state.editingId || crypto.randomUUID(),
     name: data.get("name").trim().toUpperCase(),
     type: data.get("type"),
     quantity: parseFloat(data.get("quantity")),
@@ -43,14 +74,22 @@ form.addEventListener("submit", (e) => {
   };
   if (!holding.name || !(holding.quantity >= 0) || !(holding.price >= 0)) return;
 
-  if (state.editingId) {
-    state.holdings = state.holdings.map((h) => (h.id === state.editingId ? holding : h));
-  } else {
-    state.holdings.push(holding);
+  const submitBtn = $("#submit-btn");
+  submitBtn.disabled = true;
+  try {
+    if (state.editingId) {
+      const saved = fromApi(await api("PUT", `/api/holdings/${state.editingId}`, toApi(holding)));
+      state.holdings = state.holdings.map((h) => (h.id === saved.id ? saved : h));
+    } else {
+      state.holdings.push(fromApi(await api("POST", "/api/holdings", toApi(holding))));
+    }
+    resetForm();
+    render();
+  } catch {
+    setQuoteStatus("השמירה נכשלה. נסה שוב.", "error");
+  } finally {
+    submitBtn.disabled = false;
   }
-  resetForm();
-  save();
-  render();
 });
 
 $("#cancel-edit").addEventListener("click", resetForm);
@@ -124,10 +163,14 @@ function startEdit(id) {
   form.name.focus();
 }
 
-function remove(id) {
+async function remove(id) {
+  try {
+    await api("DELETE", `/api/holdings/${id}`);
+  } catch (err) {
+    if (err.status !== 404) { setQuoteStatus("המחיקה נכשלה. נסה שוב.", "error"); return; }
+  }
   state.holdings = state.holdings.filter((h) => h.id !== id);
   if (state.editingId === id) resetForm();
-  save();
   render();
 }
 
@@ -297,7 +340,7 @@ document.querySelectorAll(".toggle button").forEach((btn) => {
 const analystForm = $("#analyst-form");
 const questionEl = $("#question");
 const askBtn = $("#ask-btn");
-const answerEl = $("#answer");
+const threadEl = $("#thread");
 
 const ANALYST_ERRORS = {
   no_api_key: "האנליסט עוד לא מחובר: צריך להוסיף מפתח API של Google Gemini לקובץ ‎.env‎ ולהפעיל מחדש את השרת.",
@@ -339,39 +382,108 @@ function renderMarkdown(md) {
   return out.join("");
 }
 
+// ---------- Chat history ----------
+// The server stores every message; the analyst only "sees" the last `contextTurns` turns.
+let turnCount = 0;
+let contextTurns = 10;
+
+function exchangeHtml(question, answer) {
+  return `<div class="q">שאלת: ${escapeHtml(question || "ניתוח כללי של התיק")}</div>` + renderMarkdown(answer);
+}
+
+function updateHistoryHead() {
+  $("#history-head").hidden = turnCount === 0;
+  $("#history-count").textContent =
+    `השיחה נשמרת · האנליסט זוכר את ${Math.min(turnCount, contextTurns)}/${contextTurns} ההתכתבויות האחרונות`;
+}
+
+// Groups role-based messages into question/answer pairs for display
+function toTurns(messages) {
+  const turns = [];
+  for (const m of messages) {
+    if (m.role === "user") turns.push({ question: m.content, answer: "" });
+    else if (turns.length && !turns[turns.length - 1].answer) turns[turns.length - 1].answer = m.content;
+  }
+  return turns.filter((t) => t.answer);
+}
+
+// Adds a message block to the thread and scrolls it into view
+function addBlock(className, content, isHtml = false) {
+  const el = document.createElement("div");
+  el.className = className;
+  el[isHtml ? "innerHTML" : "textContent"] = content;
+  threadEl.appendChild(el);
+  threadEl.scrollTop = threadEl.scrollHeight;
+  return el;
+}
+
+// Removes a leftover error message, if any
+function clearTransient() {
+  threadEl.querySelectorAll(".answer.error").forEach((el) => el.remove());
+}
+
+async function loadHistory() {
+  try {
+    const data = await api("GET", "/api/history");
+    contextTurns = data.context_turns;
+    const turns = toTurns(data.messages);
+    turnCount = turns.length;
+    threadEl.innerHTML = "";
+    turns.forEach((t) => addBlock("answer", exchangeHtml(t.question, t.answer), true));
+    updateHistoryHead();
+  } catch {}
+}
+
 async function askAnalyst(question) {
   askBtn.disabled = true;
-  answerEl.hidden = false;
-  answerEl.className = "answer loading";
-  answerEl.textContent = "האנליסט בוחן את התיק שלך";
+  clearTransient();
+  const block = addBlock("answer loading", "האנליסט בוחן את התיק שלך");
   try {
     const res = await fetch("/api/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, holdings: state.holdings }),
+      // The server reads the portfolio from the database, so only the question is sent
+      body: JSON.stringify({ question }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(ANALYST_ERRORS[data.error] || "משהו השתבש בפנייה לאנליסט. נסה שוב.");
-    answerEl.className = "answer";
-    answerEl.innerHTML = `<div class="q">שאלת: ${escapeHtml(question || "ניתוח כללי של התיק")}</div>` + renderMarkdown(data.answer);
+    block.className = "answer";
+    block.innerHTML = exchangeHtml(question, data.answer);
+    questionEl.value = "";
+    turnCount++;
+    updateHistoryHead();
   } catch (err) {
-    answerEl.className = "answer error";
-    answerEl.textContent = err.message;
+    block.className = "answer error";
+    block.textContent = err.message;
   } finally {
     askBtn.disabled = false;
+    threadEl.scrollTop = threadEl.scrollHeight;
   }
 }
+
+$("#clear-history").addEventListener("click", async () => {
+  if (!confirm("למחוק את כל השיחה עם האנליסט?")) return;
+  try {
+    await api("DELETE", "/api/history");
+    threadEl.innerHTML = "";
+    turnCount = 0;
+    updateHistoryHead();
+  } catch {
+    clearTransient();
+    addBlock("answer error", "לא הצלחתי למחוק את השיחה. נסה שוב.");
+  }
+});
 
 analystForm.addEventListener("submit", (e) => {
   e.preventDefault();
   if (!state.holdings.length) {
-    answerEl.hidden = false;
-    answerEl.className = "answer error";
-    answerEl.textContent = "התיק ריק – הוסף נכסים כדי שהאנליסט יוכל לנתח אותו.";
+    clearTransient();
+    addBlock("answer error", "התיק ריק – הוסף נכסים כדי שהאנליסט יוכל לנתח אותו.");
     return;
   }
   askAnalyst(questionEl.value.trim());
 });
+
 
 $("#chips").addEventListener("click", (e) => {
   const chip = e.target.closest(".chip");
@@ -381,3 +493,5 @@ $("#chips").addEventListener("click", (e) => {
 });
 
 render();
+loadPortfolio();
+loadHistory();

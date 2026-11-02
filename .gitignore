@@ -8,3 +8,6 @@ cv/
 .claude/
 __pycache__/
 *.pyc
+
+# Local database (analyst conversation memory)
+data/
