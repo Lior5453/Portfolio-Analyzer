@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>תיק ההשקעות שלי</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="page-header">
+    <h1>תיק ההשקעות שלי</h1>
+    <p class="subtitle">הזן את האחזקות שלך וראה איך התיק מחולק</p>
+  </header>
+
+  <main class="layout">
+    <!-- Part 1: portfolio holdings entry -->
+    <section class="card" aria-labelledby="form-title">
+      <h2 id="form-title">הוספת נכס</h2>
+      <form id="holding-form" autocomplete="off">
+        <div class="field">
+          <label for="name">שם הנכס / סימול</label>
+          <input id="name" name="name" required placeholder="לדוגמה: AAPL, TEVA.TA, BTC-USD" dir="ltr">
+          <p class="quote-status" id="quote-status" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="type">סוג נכס</label>
+          <select id="type" name="type">
+            <option>מניות</option>
+            <option>אג"ח</option>
+            <option>קרן סל</option>
+            <option>קרן נאמנות</option>
+            <option>קריפטו</option>
+            <option>מזומן</option>
+            <option>אחר</option>
+          </select>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="quantity">כמות יחידות</label>
+            <input id="quantity" name="quantity" type="number" min="0" step="any" required placeholder="10">
+          </div>
+          <div class="field">
+            <label for="price">מחיר ליחידה (₪)</label>
+            <input id="price" name="price" type="number" min="0" step="any" required placeholder="150">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn-primary" id="submit-btn">הוסף לתיק</button>
+          <button type="button" class="btn-secondary" id="cancel-edit" hidden>ביטול עריכה</button>
+        </div>
+      </form>
+
+      <h2 class="table-title">האחזקות שלי</h2>
+      <div class="table-wrap">
+        <table id="holdings-table">
+          <thead>
+            <tr>
+              <th>נכס</th>
+              <th>סוג</th>
+              <th class="num">כמות</th>
+              <th class="num">מחיר</th>
+              <th class="num">שווי</th>
+              <th class="num">אחוז</th>
+              <th><span class="sr-only">פעולות</span></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4">סה"כ</td>
+              <td class="num" id="total-cell">₪0</td>
+              <td class="num">100%</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+        <p class="empty" id="empty-msg">עדיין אין נכסים בתיק. הוסף את הראשון למעלה.</p>
+      </div>
+    </section>
+
+    <div class="side-col">
+    <!-- Part 2: portfolio allocation chart -->
+    <section class="card" aria-labelledby="chart-title">
+      <div class="chart-head">
+        <h2 id="chart-title">חלוקת התיק</h2>
+        <div class="toggle" role="group" aria-label="קיבוץ הגרף">
+          <button type="button" data-group="name" aria-pressed="true">לפי נכס</button>
+          <button type="button" data-group="type" aria-pressed="false">לפי סוג</button>
+        </div>
+      </div>
+      <div class="chart-area">
+        <svg id="donut" viewBox="0 0 240 240" role="img" aria-label="גרף חלוקת התיק"></svg>
+        <div class="donut-center" aria-hidden="true">
+          <div class="center-value" id="center-value">₪0</div>
+          <div class="center-label" id="center-label">שווי התיק</div>
+        </div>
+        <div class="tooltip" id="tooltip" hidden></div>
+      </div>
+      <ul class="legend" id="legend"></ul>
+    </section>
+
+    <!-- Part 3: analyst (Google Gemini) -->
+    <section class="card analyst" aria-labelledby="analyst-title">
+      <h2 id="analyst-title">האנליסט</h2>
+      <p class="analyst-intro">שאל שאלה על התיק. נתוני התיק מצורפים לשאלה אוטומטית.</p>
+
+      <div class="chips" id="chips">
+        <button type="button" class="chip">מה מצב התיק שלי ומה היית ממליץ לעשות?</button>
+        <button type="button" class="chip">איך אפשר לשפר את הפיזור?</button>
+        <button type="button" class="chip">האם התיק שלי מסוכן מדי?</button>
+      </div>
+
+      <form id="analyst-form">
+        <label for="question" class="sr-only">השאלה שלך</label>
+        <textarea id="question" rows="3" placeholder="לדוגמה: אני בן 30 ומשקיע לטווח ארוך – מה כדאי לשנות?"></textarea>
+        <button type="submit" class="btn-primary" id="ask-btn">שאל את האנליסט</button>
+      </form>
+
+      <div class="answer" id="answer" aria-live="polite" hidden></div>
+      <p class="disclaimer">הניתוח נוצר על ידי בינה מלאכותית, לצורכי לימוד בלבד, ואינו מהווה ייעוץ השקעות.</p>
+    </section>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+# Secrets - never commit
+.env
+
+# Personal files
+cv/
+
+# Local tooling
+.claude/
+__pycache__/
+*.pyc
