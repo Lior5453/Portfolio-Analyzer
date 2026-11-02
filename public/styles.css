@@ -106,12 +106,12 @@ body {
   margin: 0 auto;
   padding: 16px;
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr); /* holdings get the most room */
   gap: 16px;
   align-items: start;
 }
 /* Medium screens: holdings and chart side by side, the analyst below at full width */
-@media (max-width: 1200px) {
+@media (max-width: 1280px) {
   .layout { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
   .analyst-card { grid-column: 1 / -1; }
 }
@@ -162,8 +162,11 @@ button { font: inherit; cursor: pointer; border-radius: 8px; }
 /* Table */
 /* position: relative keeps hidden labels inside the scroll area (otherwise they widen the whole page on phones) */
 .table-wrap { overflow-x: auto; position: relative; }
-/* Long asset names are cut with an ellipsis; the full name shows on hover */
-#holdings-table .n { display: inline-block; max-width: 14em; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+/* Compact holdings table at every width, so it fits its column without scrolling */
+#holdings-table th, #holdings-table td { padding: 8px 4px; }
+#holdings-table td:nth-child(2) { white-space: normal; } /* long type names wrap */
+#holdings-table .row-actions { flex-direction: column; align-items: flex-end; gap: 0; }
+#holdings-table .icon-btn { padding: 2px 4px; }
 table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 th, td { padding: 8px 6px; text-align: start; border-bottom: 1px solid var(--border); white-space: nowrap; }
 th { color: var(--text-muted); font-weight: 500; font-size: 0.8rem; }
@@ -188,10 +191,7 @@ tfoot td { font-weight: 600; border-bottom: none; }
   .card { padding: 14px 10px; }
   #holdings-table tr > :nth-child(3), #holdings-table tr > :nth-child(4) { display: none; }
   #holdings-table th, #holdings-table td { padding: 8px 3px; font-size: 0.85rem; }
-  #holdings-table .n { max-width: 6em; }
-  #holdings-table td:nth-child(2) { white-space: normal; } /* long type names wrap */
-  #holdings-table .row-actions { flex-direction: column; align-items: flex-end; gap: 0; }
-  .icon-btn { padding: 2px 3px; }
+  #holdings-table .icon-btn { padding: 2px 3px; }
 }
 
 /* Chart */
@@ -256,7 +256,8 @@ tfoot td { font-weight: 600; border-bottom: none; }
 
 /* Analyst */
 .analyst-intro { margin: -8px 0 12px; font-size: 0.85rem; color: var(--text-muted); }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+/* One preset question per row, so the layout is the same in every language and width */
+.chips { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 10px; }
 .chip {
   background: var(--bg); border: 1px solid var(--border); border-radius: 999px;
   padding: 5px 12px; font-size: 0.8rem; color: var(--text-secondary);
