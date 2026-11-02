@@ -2,6 +2,7 @@
 // Holdings are stored on the server (SQLite) and loaded through the /api/portfolio endpoints.
 const LEGACY_STORAGE_KEY = "portfolio-holdings"; // used by older versions that saved holdings in the browser
 const MAX_SLICES = 8; // beyond this, the smallest assets are grouped into "Other"
+const OTHER_SLICE = "__other__"; // key of the grouped "Other" slice
 
 const state = {
   holdings: [],
@@ -15,9 +16,15 @@ const tbody = $("#holdings-table tbody");
 const svg = $("#donut");
 const tooltip = $("#tooltip");
 
-const money = new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 0 });
-const money2 = new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS", maximumFractionDigits: 2 });
-const number = new Intl.NumberFormat("he-IL", { maximumFractionDigits: 4 });
+// Number formatters follow the current language (rebuilt when it changes)
+let money, money2, number;
+function makeFormatters() {
+  money = new Intl.NumberFormat(locale(), { style: "currency", currency: "ILS", maximumFractionDigits: 0 });
+  money2 = new Intl.NumberFormat(locale(), { style: "currency", currency: "ILS", maximumFractionDigits: 2 });
+  number = new Intl.NumberFormat(locale(), { maximumFractionDigits: 4 });
+}
+applyStaticTranslations();
+makeFormatters();
 const pct = (v) => (v * 100).toFixed(1) + "%";
 
 // ---------- Server API (holdings) ----------
@@ -54,7 +61,7 @@ async function loadPortfolio() {
     if (legacy.length) { try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch {} }
     state.holdings = portfolio.holdings.map(fromApi);
   } catch {
-    setQuoteStatus("לא הצלחתי לטעון את התיק מהשרת. נסה לרענן את הדף.", "error");
+    setQuoteStatus(t("loadFailed"), "error");
   }
   render();
 }
@@ -89,7 +96,7 @@ form.addEventListener("submit", async (e) => {
     resetForm();
     render();
   } catch {
-    setQuoteStatus("השמירה נכשלה. נסה שוב.", "error");
+    setQuoteStatus(t("saveFailed"), "error");
   } finally {
     submitBtn.disabled = false;
   }
@@ -127,8 +134,8 @@ function applyTypeMode() {
   form.amount.required = cash;
   form.quantity.required = !cash;
   form.price.required = !cash;
-  $("#name-label").textContent = cash ? "שם" : "שם הנכס / סימול";
-  form.name.placeholder = cash ? "לדוגמה: עו״ש, פיקדון, קופה" : "לדוגמה: AAPL, TEVA.TA, BTC-USD";
+  $("#name-label").textContent = t(cash ? "cashNameLabel" : "nameLabel");
+  form.name.placeholder = t(cash ? "cashNamePlaceholder" : "namePlaceholder");
   form.name.dir = cash ? "auto" : "ltr";
   if (cash) {
     // No market lookup for cash
@@ -150,11 +157,11 @@ async function lookupPrice() {
   form.price.classList.remove("auto-filled");
   if (!symbol || isCash()) { setQuoteStatus(""); return; }
 
-  setQuoteStatus("מחפש מחיר עדכני…");
+  setQuoteStatus(t("quoteSearching"));
   try {
     const res = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
     if (seq !== quoteSeq) return;
-    if (res.status === 404) { setQuoteStatus("לא נמצא נכס בסימול הזה – אפשר להזין מחיר ידנית", "error"); return; }
+    if (res.status === 404) { setQuoteStatus(t("quoteNotFound"), "error"); return; }
     if (!res.ok) throw new Error();
     const q = await res.json();
     if (seq !== quoteSeq) return;
@@ -168,10 +175,10 @@ async function lookupPrice() {
       form.type.classList.add("auto-filled");
     }
     const original = q.currency === "ILS" ? "" :
-      ` (${new Intl.NumberFormat("he-IL", { style: "currency", currency: q.currency }).format(q.price)})`;
-    setQuoteStatus(`${q.name}: ${money2.format(q.priceILS)}${original}${detectedType ? ` · ${detectedType}` : ""}`, "ok");
+      ` (${new Intl.NumberFormat(locale(), { style: "currency", currency: q.currency }).format(q.price)})`;
+    setQuoteStatus(`${q.name}: ${money2.format(q.priceILS)}${original}${detectedType ? ` · ${typeLabel(detectedType)}` : ""}`, "ok");
   } catch {
-    if (seq === quoteSeq) setQuoteStatus("לא הצלחתי למשוך מחיר כרגע – אפשר להזין ידנית", "error");
+    if (seq === quoteSeq) setQuoteStatus(t("quoteFailed"), "error");
   }
 }
 
@@ -184,6 +191,8 @@ form.name.addEventListener("blur", () => {
 });
 form.price.addEventListener("input", () => form.price.classList.remove("auto-filled"));
 
+const updateSubmitLabel = () => { $("#submit-btn").textContent = t(state.editingId ? "saveChanges" : "addToPortfolio"); };
+
 function resetForm() {
   form.reset();
   clearTimeout(quoteTimer);
@@ -193,7 +202,7 @@ function resetForm() {
   form.price.classList.remove("auto-filled");
   form.type.classList.remove("auto-filled");
   state.editingId = null;
-  $("#submit-btn").textContent = "הוסף לתיק";
+  updateSubmitLabel();
   $("#cancel-edit").hidden = true;
   applyTypeMode();
 }
@@ -209,7 +218,7 @@ function startEdit(id) {
   form.quantity.value = h.quantity;
   form.price.value = h.price;
   form.amount.value = +(h.quantity * h.price).toFixed(2);
-  $("#submit-btn").textContent = "שמור שינויים";
+  updateSubmitLabel();
   $("#cancel-edit").hidden = false;
   form.name.focus();
 }
@@ -218,7 +227,7 @@ async function remove(id) {
   try {
     await api("DELETE", `/api/holdings/${id}`);
   } catch (err) {
-    if (err.status !== 404) { setQuoteStatus("המחיקה נכשלה. נסה שוב.", "error"); return; }
+    if (err.status !== 404) { setQuoteStatus(t("deleteFailed"), "error"); return; }
   }
   state.holdings = state.holdings.filter((h) => h.id !== id);
   if (state.editingId === id) resetForm();
@@ -244,11 +253,17 @@ function slices() {
     const keep = new Set(sorted.slice(0, MAX_SLICES - 1).map((s) => s.label));
     const kept = items.filter((s) => keep.has(s.label)).map((s, i) => ({ ...s, color: `var(--series-${i + 1})` }));
     const otherValue = items.filter((s) => !keep.has(s.label)).reduce((a, s) => a + s.value, 0);
-    items = [...kept, { label: "אחר", value: otherValue, color: "var(--series-other)" }];
+    items = [...kept, { label: OTHER_SLICE, value: otherValue, color: "var(--series-other)" }];
   }
   return items
     .filter((s) => s.value > 0)
     .map((s) => ({ ...s, share: sum ? s.value / sum : 0 }));
+}
+
+// Text shown for a slice: asset types and "Other" are translated, asset names are shown as-is
+function sliceLabel(s) {
+  if (s.label === OTHER_SLICE) return t("other");
+  return state.groupBy === "type" ? typeLabel(s.label) : s.label;
 }
 
 function colorForHolding(h, list) {
@@ -279,11 +294,11 @@ function renderTable() {
       <td class="num">${money.format(v)}</td>
       <td class="num">${sum ? pct(v / sum) : "—"}</td>
       <td><div class="row-actions">
-        <button type="button" class="icon-btn" data-edit="${h.id}">עריכה</button>
-        <button type="button" class="icon-btn delete" data-del="${h.id}">מחיקה</button>
+        <button type="button" class="icon-btn" data-edit="${h.id}">${t("edit")}</button>
+        <button type="button" class="icon-btn delete" data-del="${h.id}">${t("delete")}</button>
       </div></td>`;
     tr.querySelector(".n").textContent = h.name;
-    tr.querySelector(".t").textContent = h.type;
+    tr.querySelector(".t").textContent = typeLabel(h.type);
     tbody.appendChild(tr);
   }
   $("#total-cell").textContent = money.format(sum);
@@ -341,7 +356,7 @@ function renderChart() {
     li.dataset.index = i;
     li.innerHTML = `<span class="swatch" style="background:${s.color}"></span>
       <span class="label"></span><span class="pct">${pct(s.share)}</span><span class="val">${money.format(s.value)}</span>`;
-    li.querySelector(".label").textContent = s.label;
+    li.querySelector(".label").textContent = sliceLabel(s);
     legend.appendChild(li);
   });
   renderChart.list = list;
@@ -355,7 +370,7 @@ function highlight(i, evt) {
   svg.classList.toggle("hovering", s != null && list.length > 1);
   if (!s) { tooltip.hidden = true; return; }
   tooltip.innerHTML = `<strong></strong><span>${pct(s.share)} · ${money.format(s.value)}</span>`;
-  tooltip.querySelector("strong").textContent = s.label;
+  tooltip.querySelector("strong").textContent = sliceLabel(s);
   tooltip.hidden = false;
   const box = svg.parentElement.getBoundingClientRect();
   if (evt) {
@@ -380,16 +395,19 @@ $("#legend").addEventListener("mouseover", (e) => {
 $("#legend").addEventListener("mouseleave", clearHighlight);
 
 // ---------- View toggle: allocation (by asset / by type) or comparison ----------
+const updateChartTitle = () => {
+  $("#chart-title").textContent = t($("#compare").hidden ? "allocation" : "comparePerformance");
+};
 const viewButtons = document.querySelectorAll(".chart-head .toggle button");
 viewButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
     viewButtons.forEach((b) => b.setAttribute("aria-pressed", b === btn));
     const comparing = btn.dataset.view === "compare";
     if (!comparing) state.groupBy = btn.dataset.group;
-    $("#chart-title").textContent = comparing ? "השוואת ביצועים" : "חלוקת התיק";
     $("#compare").hidden = !comparing;
     $(".chart-area").hidden = comparing;
     $("#legend").hidden = comparing;
+    updateChartTitle();
     comparing ? loadComparison() : render();
   });
 });
@@ -398,21 +416,21 @@ viewButtons.forEach((btn) => {
 const compareSvg = $("#compare-svg");
 const compareTooltip = $("#compare-tooltip");
 const COMPARE_SERIES = {
-  portfolio: { label: "התיק שלך", color: "var(--series-1)", width: 2.5 },
-  SPY: { label: "100% SPY", color: "var(--series-2)", width: 2 },
-  QQQM: { label: "100% QQQM", color: "var(--series-3)", width: 2 },
+  portfolio: { color: "var(--series-1)", width: 2.5 },
+  SPY: { color: "var(--series-2)", width: 2 },
+  QQQM: { color: "var(--series-3)", width: 2 },
 };
-const RANGE_LABELS = { "1mo": "בחודש האחרון", "6mo": "ב-6 החודשים האחרונים", "1y": "בשנה האחרונה", "5y": "ב-5 השנים האחרונות" };
+const seriesLabel = (key) => (key === "portfolio" ? t("yourPortfolio") : `100% ${key}`);
 // Chart geometry (SVG units); the right margin holds the end-of-line labels
 const CMP = { w: 400, h: 230, left: 44, right: 62, top: 12, bottom: 26 };
 
 const compareState = { range: "1y", data: null, cache: {}, seq: 0 };
 // The left-to-right mark keeps the sign in front of the number inside Hebrew text
-const signedPct = (v) => "‎" +(v >= 0 ? "+" : "−") + Math.abs(v * 100).toFixed(1) + "%";
+const signedPct = (v) => "\u200E" + (v >= 0 ? "+" : "−") + Math.abs(v * 100).toFixed(1) + "%";
 const shortDate = (t, withYear) =>
-  new Date(t * 1000).toLocaleDateString("he-IL", withYear ? { month: "short", year: "numeric" } : { day: "numeric", month: "short" });
+  new Date(t * 1000).toLocaleDateString(locale(), withYear ? { month: "short", year: "numeric" } : { day: "numeric", month: "short" });
 
-const fullDate = (t) => new Date(t * 1000).toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric" });
+const fullDate = (t) => new Date(t * 1000).toLocaleDateString(locale(), { day: "numeric", month: "short", year: "numeric" });
 
 // Cached data is reused only while the holdings stay the same
 const holdingsKey = () => JSON.stringify(state.holdings.map((h) => [h.name, h.quantity, h.price]));
@@ -425,19 +443,19 @@ async function loadComparison() {
     compareSvg.innerHTML = "";
     $("#compare-legend").innerHTML = "";
     $("#compare-note").textContent = "";
-    summary.textContent = "התיק ריק – הוסף נכסים כדי להשוות ביצועים.";
+    summary.textContent = t("compareEmpty");
     return;
   }
   const cacheKey = range + holdingsKey();
   let data = compareState.cache[cacheKey];
   if (!data) {
-    summary.textContent = "טוען נתוני מחירים היסטוריים…";
+    summary.textContent = t("compareLoading");
     compareSvg.classList.add("loading");
     try {
       data = await api("GET", `/api/compare?range=${range}`);
       compareState.cache[cacheKey] = data;
     } catch {
-      if (seq === compareState.seq) summary.textContent = "לא הצלחתי לטעון נתונים היסטוריים כרגע. נסה שוב בעוד רגע.";
+      if (seq === compareState.seq) summary.textContent = t("compareFailed");
       compareSvg.classList.remove("loading");
       return;
     }
@@ -455,14 +473,13 @@ function renderComparison() {
 
   // Headline: how the portfolio did vs. each benchmark
   const mine = finals.portfolio;
-  // e.g. "יותר מ-SPY (+6.9%)" - each benchmark's own return is shown next to it
+  // e.g. "more than SPY (+6.9%)" - each benchmark's own return is shown next to it
   const verdicts = ["SPY", "QQQM"].map((k) => {
     const diff = mine - finals[k];
-    const word = Math.abs(diff) < 0.0005 ? "בדיוק כמו" : diff > 0 ? "יותר מ" : "פחות מ";
-    return `${word}-${k} (${signedPct(finals[k])})`;
+    const kind = Math.abs(diff) < 0.0005 ? "verdictSame" : diff > 0 ? "verdictMore" : "verdictLess";
+    return t(kind, k, signedPct(finals[k]));
   });
-  $("#compare-summary").innerHTML =
-    `${RANGE_LABELS[data.range]} התיק שלך השיג <strong>${signedPct(mine)}</strong> – ${verdicts[0]} ו${verdicts[1]}.`;
+  $("#compare-summary").innerHTML = t("compareSummary", t("rangeSentence")[data.range], signedPct(mine), verdicts[0], verdicts[1]);
 
   // Scales
   const all = data.series.flatMap((s) => s.returns);
@@ -502,7 +519,7 @@ function renderComparison() {
   const ends = data.series.map((s) => ({ key: s.key, y: y(finals[s.key]) })).sort((a, b) => a.y - b.y);
   for (let i = 1; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 14);
   for (const e of ends) {
-    const name = e.key === "portfolio" ? "התיק" : e.key;
+    const name = e.key === "portfolio" ? t("portfolioShort") : e.key;
     out += `<text class="end-label" x="${CMP.left + plotW + 6}" y="${e.y + 4}">${name} ${signedPct(finals[e.key])}</text>`;
   }
 
@@ -518,12 +535,12 @@ function renderComparison() {
   // Legend (always present, so identity never relies on color alone)
   $("#compare-legend").innerHTML = data.series.map((s) => `
     <li><span class="swatch line-swatch" style="background:${COMPARE_SERIES[s.key].color}"></span>
-      <span class="label">${COMPARE_SERIES[s.key].label}</span>
+      <span class="label">${seriesLabel(s.key)}</span>
       <span class="pct">${signedPct(finals[s.key])}</span>
       <span class="val">${money.format(data.start_value * (1 + finals[s.key]))}</span></li>`).join("");
 
-  let note = `ההשוואה מניחה שהתיק הנוכחי הוחזק לאורך כל התקופה, ושאותו סכום (${money.format(data.start_value)}) הושקע כולו ב-SPY או ב-QQQM. כולל דיבידנדים ושער הדולר, בשקלים.`;
-  if (data.flat_symbols.length) note += ` נכסים ללא נתונים היסטוריים נחשבו בערך קבוע: ${data.flat_symbols.join(", ")}.`;
+  let note = t("compareNote", money.format(data.start_value));
+  if (data.flat_symbols.length) note += t("compareFlat", data.flat_symbols.join(", "));
   $("#compare-note").textContent = note;
 }
 
@@ -541,7 +558,7 @@ function compareHover(evt) {
   });
   const rows = [...data.series]
     .sort((a, b) => b.returns[i] - a.returns[i])
-    .map((s) => `<div class="tt-row"><span class="swatch line-swatch" style="background:${COMPARE_SERIES[s.key].color}"></span>${COMPARE_SERIES[s.key].label}<b>${signedPct(s.returns[i])}</b></div>`)
+    .map((s) => `<div class="tt-row"><span class="swatch line-swatch" style="background:${COMPARE_SERIES[s.key].color}"></span>${seriesLabel(s.key)}<b>${signedPct(s.returns[i])}</b></div>`)
     .join("");
   compareTooltip.innerHTML = `<strong>${fullDate(data.times[i])}</strong>${rows}`;
   compareTooltip.hidden = false;
@@ -576,13 +593,6 @@ const questionEl = $("#question");
 const askBtn = $("#ask-btn");
 const threadEl = $("#thread");
 
-const ANALYST_ERRORS = {
-  no_api_key: "האנליסט עוד לא מחובר: צריך להוסיף מפתח API של Google Gemini לקובץ ‎.env‎ ולהפעיל מחדש את השרת.",
-  bad_api_key: "מפתח ה-API לא תקין. בדוק את הקובץ ‎.env‎.",
-  rate_limited: "יותר מדי בקשות כרגע. נסה שוב בעוד דקה.",
-  timeout: "שירות ה-AI עמוס כרגע ולא ענה בזמן. נסה שוב בעוד כמה דקות.",
-  refused: "האנליסט לא יכול לענות על השאלה הזו. נסה לנסח אותה אחרת.",
-};
 
 const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -621,14 +631,16 @@ function renderMarkdown(md) {
 let turnCount = 0;
 let contextTurns = 10;
 
+const questionLine = (question) => `${t("youAsked")} ${escapeHtml(question || t("generalAnalysis"))}`;
+
 function exchangeHtml(question, answer) {
-  return `<div class="q">שאלת: ${escapeHtml(question || "ניתוח כללי של התיק")}</div>` + renderMarkdown(answer);
+  return `<div class="q" data-question="${escapeHtml(question || "")}">${questionLine(question)}</div>` + renderMarkdown(answer);
 }
 
 function updateHistoryHead() {
   $("#history-head").hidden = turnCount === 0;
   $("#history-count").textContent =
-    `השיחה נשמרת · האנליסט זוכר עד ${contextTurns} התכתבויות אחרונות (כרגע: ${Math.min(turnCount, contextTurns)})`;
+    t("historyLine", contextTurns, Math.min(turnCount, contextTurns));
 }
 
 // Groups role-based messages into question/answer pairs for display
@@ -671,16 +683,17 @@ async function loadHistory() {
 async function askAnalyst(question) {
   askBtn.disabled = true;
   clearTransient();
-  const block = addBlock("answer loading", "האנליסט בוחן את התיק שלך");
+  const block = addBlock("answer loading", t("analyzing"));
   try {
     const res = await fetch("/api/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       // The server reads the portfolio from the database, so only the question is sent
-      body: JSON.stringify({ question }),
+      // The answer language follows the page language
+      body: JSON.stringify({ question, lang: currentLang }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(ANALYST_ERRORS[data.error] || "משהו השתבש בפנייה לאנליסט. נסה שוב.");
+    if (!res.ok) throw new Error(t("analystErrors")[data.error] || t("analystGeneric"));
     block.className = "answer";
     block.innerHTML = exchangeHtml(question, data.answer);
     questionEl.value = "";
@@ -696,7 +709,7 @@ async function askAnalyst(question) {
 }
 
 $("#clear-history").addEventListener("click", async () => {
-  if (!confirm("למחוק את כל השיחה עם האנליסט?")) return;
+  if (!confirm(t("confirmClear"))) return;
   try {
     await api("DELETE", "/api/history");
     threadEl.innerHTML = "";
@@ -704,7 +717,7 @@ $("#clear-history").addEventListener("click", async () => {
     updateHistoryHead();
   } catch {
     clearTransient();
-    addBlock("answer error", "לא הצלחתי למחוק את השיחה. נסה שוב.");
+    addBlock("answer error", t("clearFailed"));
   }
 });
 
@@ -712,7 +725,7 @@ analystForm.addEventListener("submit", (e) => {
   e.preventDefault();
   if (!state.holdings.length) {
     clearTransient();
-    addBlock("answer error", "התיק ריק – הוסף נכסים כדי שהאנליסט יוכל לנתח אותו.");
+    addBlock("answer error", t("analystEmpty"));
     return;
   }
   askAnalyst(questionEl.value.trim());
@@ -726,6 +739,29 @@ $("#chips").addEventListener("click", (e) => {
   analystForm.requestSubmit();
 });
 
+// ---------- Language switch ----------
+document.querySelectorAll(".lang-switch button").forEach((btn) => {
+  btn.addEventListener("click", () => setLang(btn.dataset.lang));
+});
+
+// Updates the text that app.js builds itself (static text is handled by i18n.js)
+function refreshDynamicText() {
+  updateSubmitLabel();
+  updateChartTitle();
+  applyTypeMode();
+  updateHistoryHead();
+  threadEl.querySelectorAll(".q[data-question]").forEach((q) => { q.innerHTML = questionLine(q.dataset.question); });
+}
+
+document.addEventListener("langchange", () => {
+  makeFormatters();
+  setQuoteStatus("");
+  refreshDynamicText();
+  render();
+  if (!$("#compare").hidden && compareState.data) renderComparison();
+});
+
+refreshDynamicText();
 render();
 loadPortfolio();
 loadHistory();

@@ -5,17 +5,66 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>תיק ההשקעות שלי</title>
   <link rel="stylesheet" href="styles.css">
+  <script>
+    // Set the page direction before first paint, so an English page doesn't flash right-to-left
+    try {
+      if (localStorage.getItem("portfolio-lang") === "en") {
+        document.documentElement.lang = "en";
+        document.documentElement.dir = "ltr";
+      }
+    } catch {}
+  </script>
 </head>
 <body>
   <header class="page-header">
-    <h1>תיק ההשקעות שלי</h1>
-    <p class="subtitle">הזן את האחזקות שלך וראה איך התיק מחולק</p>
+    <div class="page-heading">
+      <h1 data-i18n="pageTitle">תיק ההשקעות שלי</h1>
+      <p class="subtitle" data-i18n="subtitle">הזן את האחזקות שלך וראה איך התיק מחולק</p>
+    </div>
+
+    <!-- Language switcher (Hebrew / English) -->
+    <div class="toggle lang-switch" role="group" aria-label="שפה" data-i18n-aria="language">
+      <button type="button" data-lang="he" lang="he" aria-pressed="true">
+        <svg class="flag" viewBox="0 0 22 16" aria-hidden="true">
+          <rect width="22" height="16" fill="#fff"/>
+          <rect y="1.6" width="22" height="2.4" fill="#0038b8"/>
+          <rect y="12" width="22" height="2.4" fill="#0038b8"/>
+          <g fill="none" stroke="#0038b8" stroke-width="0.85">
+            <polygon points="11,4.6 13.94,9.7 8.06,9.7"/>
+            <polygon points="11,11.4 13.94,6.3 8.06,6.3"/>
+          </g>
+        </svg>
+        <span>עברית</span>
+      </button>
+      <button type="button" data-lang="en" lang="en" aria-pressed="false">
+        <svg class="flag" viewBox="0 0 22 16" aria-hidden="true">
+          <rect width="22" height="16" fill="#fff"/>
+          <g fill="#b22234">
+            <rect y="0" width="22" height="1.23"/>
+            <rect y="2.46" width="22" height="1.23"/>
+            <rect y="4.92" width="22" height="1.23"/>
+            <rect y="7.38" width="22" height="1.23"/>
+            <rect y="9.85" width="22" height="1.23"/>
+            <rect y="12.31" width="22" height="1.23"/>
+            <rect y="14.77" width="22" height="1.23"/>
+          </g>
+          <rect width="9.4" height="8.61" fill="#3c3b6e"/>
+          <g fill="#fff">
+            <circle cx="1.6" cy="1.5" r="0.5"/><circle cx="4.7" cy="1.5" r="0.5"/><circle cx="7.8" cy="1.5" r="0.5"/>
+            <circle cx="3.15" cy="3.3" r="0.5"/><circle cx="6.25" cy="3.3" r="0.5"/>
+            <circle cx="1.6" cy="5.1" r="0.5"/><circle cx="4.7" cy="5.1" r="0.5"/><circle cx="7.8" cy="5.1" r="0.5"/>
+            <circle cx="3.15" cy="6.9" r="0.5"/><circle cx="6.25" cy="6.9" r="0.5"/>
+          </g>
+        </svg>
+        <span>English</span>
+      </button>
+    </div>
   </header>
 
   <main class="layout">
     <!-- Part 1: portfolio holdings entry -->
     <section class="card" aria-labelledby="form-title">
-      <h2 id="form-title">הוספת נכס</h2>
+      <h2 id="form-title" data-i18n="addAsset">הוספת נכס</h2>
       <form id="holding-form" autocomplete="off">
         <div class="field">
           <label for="name" id="name-label">שם הנכס / סימול</label>
@@ -23,63 +72,64 @@
           <p class="quote-status" id="quote-status" aria-live="polite"></p>
         </div>
         <div class="field">
-          <label for="type">סוג נכס</label>
+          <label for="type" data-i18n="assetType">סוג נכס</label>
+          <!-- Option values are the stored (Hebrew) types; their labels are translated by i18n.js -->
           <select id="type" name="type">
-            <option>מניות</option>
-            <option>אג"ח</option>
-            <option>קרן סל</option>
-            <option>קרן נאמנות</option>
-            <option>קריפטו</option>
-            <option>מזומן</option>
-            <option>אחר</option>
+            <option value="מניות">מניות</option>
+            <option value='אג"ח'>אג"ח</option>
+            <option value="קרן סל">קרן סל</option>
+            <option value="קרן נאמנות">קרן נאמנות</option>
+            <option value="קריפטו">קריפטו</option>
+            <option value="מזומן">מזומן</option>
+            <option value="אחר">אחר</option>
           </select>
         </div>
         <!-- Cash: a single amount instead of quantity × price -->
         <div class="field" id="amount-field" hidden>
-          <label for="amount">סכום (₪)</label>
+          <label for="amount" data-i18n="amount">סכום (₪)</label>
           <input id="amount" name="amount" type="number" min="0" step="any" placeholder="50000">
         </div>
         <div class="row" id="units-row">
           <div class="field">
-            <label for="quantity">כמות יחידות</label>
+            <label for="quantity" data-i18n="quantity">כמות יחידות</label>
             <input id="quantity" name="quantity" type="number" min="0" step="any" required placeholder="10">
           </div>
           <div class="field">
-            <label for="price">מחיר ליחידה (₪)</label>
+            <label for="price" data-i18n="unitPrice">מחיר ליחידה (₪)</label>
             <input id="price" name="price" type="number" min="0" step="any" required placeholder="150">
           </div>
         </div>
         <div class="form-actions">
           <button type="submit" class="btn-primary" id="submit-btn">הוסף לתיק</button>
-          <button type="button" class="btn-secondary" id="cancel-edit" hidden>ביטול עריכה</button>
+          <button type="button" class="btn-secondary" id="cancel-edit" data-i18n="cancelEdit" hidden>ביטול עריכה</button>
         </div>
       </form>
 
-      <h2 class="table-title">האחזקות שלי</h2>
+      <h2 class="table-title" data-i18n="myHoldings">האחזקות שלי</h2>
       <div class="table-wrap">
         <table id="holdings-table">
           <thead>
             <tr>
-              <th>נכס</th>
-              <th>סוג</th>
-              <th class="num">כמות</th>
-              <th class="num">מחיר</th>
-              <th class="num">שווי</th>
-              <th class="num">אחוז</th>
-              <th><span class="sr-only">פעולות</span></th>
+              <th data-i18n="colAsset">נכס</th>
+              <th data-i18n="colType">סוג</th>
+              <th class="num" data-i18n="colQty">כמות</th>
+              <th class="num" data-i18n="colPrice">מחיר</th>
+              <th class="num" data-i18n="colValue">שווי</th>
+              <th class="num" data-i18n="colShare">אחוז</th>
+              <th><span class="sr-only" data-i18n="colActions">פעולות</span></th>
             </tr>
           </thead>
           <tbody></tbody>
           <tfoot>
             <tr>
-              <td colspan="4">סה"כ</td>
+              <td colspan="4" data-i18n="total">סה"כ</td>
               <td class="num" id="total-cell">₪0</td>
               <td class="num">100%</td>
               <td></td>
             </tr>
           </tfoot>
         </table>
-        <p class="empty" id="empty-msg">עדיין אין נכסים בתיק. הוסף את הראשון למעלה.</p>
+        <p class="empty" id="empty-msg" data-i18n="emptyHoldings">עדיין אין נכסים בתיק. הוסף את הראשון למעלה.</p>
       </div>
     </section>
 
@@ -88,24 +138,24 @@
     <section class="card" aria-labelledby="chart-title">
       <div class="chart-head">
         <h2 id="chart-title">חלוקת התיק</h2>
-        <div class="toggle" role="group" aria-label="תצוגת הגרף">
-          <button type="button" data-group="name" aria-pressed="true">לפי נכס</button>
-          <button type="button" data-group="type" aria-pressed="false">לפי סוג</button>
-          <button type="button" data-view="compare" aria-pressed="false">השוואה</button>
+        <div class="toggle view-toggle" role="group" aria-label="תצוגת הגרף" data-i18n-aria="chartView">
+          <button type="button" data-group="name" aria-pressed="true" data-i18n="byAsset">לפי נכס</button>
+          <button type="button" data-group="type" aria-pressed="false" data-i18n="byType">לפי סוג</button>
+          <button type="button" data-view="compare" aria-pressed="false" data-i18n="compare">השוואה</button>
         </div>
       </div>
 
       <!-- Performance comparison: portfolio vs. 100% SPY / 100% QQQM -->
       <div class="compare" id="compare" hidden>
-        <div class="toggle range-toggle" role="group" aria-label="טווח זמן">
-          <button type="button" data-range="1mo" aria-pressed="false">חודש</button>
-          <button type="button" data-range="6mo" aria-pressed="false">6 חודשים</button>
-          <button type="button" data-range="1y" aria-pressed="true">שנה</button>
-          <button type="button" data-range="5y" aria-pressed="false">5 שנים</button>
+        <div class="toggle range-toggle" role="group" aria-label="טווח זמן" data-i18n-aria="timeRange">
+          <button type="button" data-range="1mo" aria-pressed="false" data-i18n="range1mo">חודש</button>
+          <button type="button" data-range="6mo" aria-pressed="false" data-i18n="range6mo">6 חודשים</button>
+          <button type="button" data-range="1y" aria-pressed="true" data-i18n="range1y">שנה</button>
+          <button type="button" data-range="5y" aria-pressed="false" data-i18n="range5y">5 שנים</button>
         </div>
         <p class="compare-summary" id="compare-summary" aria-live="polite"></p>
         <div class="compare-chart">
-          <svg id="compare-svg" viewBox="0 0 400 230" role="img" aria-label="גרף השוואת תשואות"></svg>
+          <svg id="compare-svg" viewBox="0 0 400 230" role="img" aria-label="גרף השוואת תשואות" data-i18n-aria="compareAria"></svg>
           <div class="tooltip compare-tooltip" id="compare-tooltip" hidden></div>
         </div>
         <ul class="legend" id="compare-legend"></ul>
@@ -113,10 +163,10 @@
       </div>
 
       <div class="chart-area">
-        <svg id="donut" viewBox="0 0 240 240" role="img" aria-label="גרף חלוקת התיק"></svg>
+        <svg id="donut" viewBox="0 0 240 240" role="img" aria-label="גרף חלוקת התיק" data-i18n-aria="donutAria"></svg>
         <div class="donut-center" aria-hidden="true">
           <div class="center-value" id="center-value">₪0</div>
-          <div class="center-label" id="center-label">שווי התיק</div>
+          <div class="center-label" id="center-label" data-i18n="portfolioValue">שווי התיק</div>
         </div>
         <div class="tooltip" id="tooltip" hidden></div>
       </div>
@@ -125,32 +175,33 @@
 
     <!-- Part 3: analyst (Google Gemini) -->
     <section class="card analyst" aria-labelledby="analyst-title">
-      <h2 id="analyst-title">האנליסט</h2>
-      <p class="analyst-intro">שאל שאלה על התיק. נתוני התיק מצורפים לשאלה אוטומטית.</p>
+      <h2 id="analyst-title" data-i18n="analyst">האנליסט</h2>
+      <p class="analyst-intro" data-i18n="analystIntro">שאל שאלה על התיק. נתוני התיק מצורפים לשאלה אוטומטית.</p>
 
       <div class="chips" id="chips">
-        <button type="button" class="chip">מה מצב התיק שלי ומה היית ממליץ לעשות?</button>
-        <button type="button" class="chip">איך אפשר לשפר את הפיזור?</button>
-        <button type="button" class="chip">האם התיק שלי מסוכן מדי?</button>
+        <button type="button" class="chip" data-i18n="chip1">מה מצב התיק שלי ומה היית ממליץ לעשות?</button>
+        <button type="button" class="chip" data-i18n="chip2">איך אפשר לשפר את הפיזור?</button>
+        <button type="button" class="chip" data-i18n="chip3">האם התיק שלי מסוכן מדי?</button>
       </div>
 
       <form id="analyst-form">
-        <label for="question" class="sr-only">השאלה שלך</label>
-        <textarea id="question" rows="3" placeholder="לדוגמה: אני בן 30 ומשקיע לטווח ארוך – מה כדאי לשנות?"></textarea>
-        <button type="submit" class="btn-primary" id="ask-btn">שאל את האנליסט</button>
+        <label for="question" class="sr-only" data-i18n="yourQuestion">השאלה שלך</label>
+        <textarea id="question" rows="3" placeholder="לדוגמה: אני בן 30 ומשקיע לטווח ארוך – מה כדאי לשנות?" data-i18n-placeholder="questionPlaceholder"></textarea>
+        <button type="submit" class="btn-primary" id="ask-btn" data-i18n="ask">שאל את האנליסט</button>
       </form>
 
       <!-- Conversation memory: last exchanges saved in the server database -->
       <div class="history-head" id="history-head" hidden>
         <span id="history-count"></span>
-        <button type="button" class="icon-btn delete" id="clear-history">נקה שיחה</button>
+        <button type="button" class="icon-btn delete" id="clear-history" data-i18n="clearChat">נקה שיחה</button>
       </div>
       <div class="thread" id="thread" aria-live="polite"></div>
-      <p class="disclaimer">הניתוח נוצר על ידי בינה מלאכותית, לצורכי לימוד בלבד, ואינו מהווה ייעוץ השקעות.</p>
+      <p class="disclaimer" data-i18n="disclaimer">הניתוח נוצר על ידי בינה מלאכותית, לצורכי לימוד בלבד, ואינו מהווה ייעוץ השקעות.</p>
     </section>
     </div>
   </main>
 
+  <script src="i18n.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

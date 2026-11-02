@@ -264,7 +264,7 @@ ANALYST_SYSTEM = """You are an experienced investment analyst helping a private 
 With every request you receive the current portfolio data (assets, types, values and percentages) and the user's question.
 
 How to answer:
-- Write in Hebrew, in simple and clear language.
+- Write in {language}, in simple and clear language (even if earlier messages were in another language).
 - Base your analysis on the actual data: cite numbers and percentages from the portfolio.
 - Address diversification (concentration in a single asset or asset type), risk level, currency exposure and liquidity, as relevant to the question.
 - End with practical, numbered recommendations: what you would consider doing with the portfolio and why.
@@ -317,6 +317,10 @@ def portfolio_summary(holdings):
     return "\n".join(lines)
 
 
+# UI language code -> the language the analyst answers in
+ANSWER_LANGUAGES = {"he": "Hebrew", "en": "English"}
+
+
 def build_contents(question, holdings, context_messages):
     """Builds the Gemini request: the context window, then the new question with the current portfolio."""
     contents = []
@@ -331,11 +335,11 @@ def build_contents(question, holdings, context_messages):
     return contents
 
 
-def analyze(question, holdings, context_messages):
+def analyze(question, holdings, context_messages, lang="he"):
     """Asks Gemini. Returns the answer text, or None if the response was blocked or empty."""
     contents = build_contents(question, holdings, context_messages)
     config = genai_types.GenerateContentConfig(
-        system_instruction=ANALYST_SYSTEM,
+        system_instruction=ANALYST_SYSTEM.replace("{language}", ANSWER_LANGUAGES.get(lang, "Hebrew")),
         max_output_tokens=16000,
     )
     models = [MODEL] + ([FALLBACK_MODEL] if FALLBACK_MODEL != MODEL else [])
@@ -667,12 +671,14 @@ class Handler(SimpleHTTPRequestHandler):
     def handle_analyze(self):
         if not has_api_key():
             return self.send_json(503, {"error": "no_api_key"})
-        question = str(self.read_json().get("question", "")).strip()[:4000]
+        body = self.read_json()
+        question = str(body.get("question", "")).strip()[:4000]
+        lang = body.get("lang") if body.get("lang") in ANSWER_LANGUAGES else "he"
         # The portfolio and the context window are read from the database (the source of truth).
         holdings = list_holdings()
         context_messages = get_context_window()
         try:
-            answer = analyze(question, holdings, context_messages)
+            answer = analyze(question, holdings, context_messages, lang)
         except genai_errors.APIError as e:
             if e.code in (400, 401, 403) and "key" in str(e).lower():
                 return self.send_json(401, {"error": "bad_api_key"})

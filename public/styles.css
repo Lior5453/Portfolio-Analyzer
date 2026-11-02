@@ -70,7 +70,19 @@ body {
   font-family: "Segoe UI", "Rubik", "Arial", sans-serif;
   line-height: 1.5;
 }
-.page-header { max-width: 1100px; margin: 0 auto; padding: 32px 16px 8px; }
+.page-header {
+  max-width: 1100px; margin: 0 auto; padding: 32px 16px 8px;
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap;
+}
+
+/* Language switcher (flag + language name) */
+.lang-switch button { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; }
+.lang-switch .flag {
+  width: 22px; height: 16px; flex: none; display: block;
+  border-radius: 3px; box-shadow: 0 0 0 1px var(--border);
+}
+.lang-switch button[aria-pressed="false"] .flag { opacity: 0.6; }
+.lang-switch button:hover .flag { opacity: 1; }
 .page-header h1 { margin: 0; font-size: 1.8rem; }
 .subtitle { margin: 4px 0 0; color: var(--text-secondary); }
 
@@ -108,7 +120,7 @@ input, select {
 }
 input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .form-actions { display: flex; gap: 8px; }
-#name { text-align: right; }
+html[dir="rtl"] #name { text-align: right; }
 .quote-status { margin: 0; min-height: 1.3em; font-size: 0.8rem; color: var(--text-muted); }
 .quote-status.ok { color: var(--text-secondary); }
 .quote-status.ok::before { content: "✓ "; color: var(--series-3); font-weight: 700; }
@@ -191,7 +203,7 @@ tfoot td { font-weight: 600; border-bottom: none; }
 #compare-svg .crosshair { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; }
 #compare-svg .cmp-dot { stroke: var(--surface-1); stroke-width: 2; }
 #compare-svg .hit-area { fill: transparent; cursor: crosshair; }
-.compare-tooltip { direction: rtl; transform: translateX(calc(-100% - 14px)); }
+.compare-tooltip { transform: translateX(calc(-100% - 14px)); }
 .compare-tooltip.flip { transform: translateX(14px); }
 .compare-tooltip .tt-row { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
 .compare-tooltip .tt-row b { margin-inline-start: auto; padding-inline-start: 12px; color: var(--text-primary); font-variant-numeric: tabular-nums; }

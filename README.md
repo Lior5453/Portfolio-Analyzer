@@ -50,7 +50,11 @@ A web app for tracking and analyzing a personal investment portfolio: enter your
 - A **"Clear conversation"** button wipes the chat history.
 - Holdings saved in the browser by older versions are **imported automatically** on first load.
 
-> The app's interface is in Hebrew (RTL).
+### 🌐 Hebrew / English
+- A language switcher with **Israeli and US flags** at the top of the page switches the whole site between **Hebrew (right-to-left)** and **English (left-to-right)** in one click.
+- Everything is translated: labels, buttons, messages, asset types, chart and comparison texts, number and date formats.
+- **The analyst answers in the selected language.**
+- The choice is remembered in the browser. Asset types are stored in one form in the database and only translated for display, so switching never affects saved data.
 
 ---
 
@@ -58,7 +62,8 @@ A web app for tracking and analyzing a personal investment portfolio: enter your
 
 1. **Add an asset** - enter a symbol (e.g. `AAPL`) and the number of units. The price **and the asset type** (stock, ETF, mutual fund, crypto) are filled in automatically from the market; you can still change them or enter a price manually. For **cash**, choose the "Cash" type: the form switches to a free-text name (e.g. a bank account) and a single **amount** field.
 2. **View the portfolio** - the chart and table update immediately. Switch between the "by asset" and "by type" views, or open **"Compare"** to see how the portfolio did against 100% SPY / QQQM.
-3. **Ask the analyst** - type a question (e.g. *"I'm 30 and investing long-term - what should I change?"*) and click **Ask the Analyst**.
+3. **Switch language** - click the Israeli or US flag at the top of the page.
+4. **Ask the analyst** - type a question (e.g. *"I'm 30 and investing long-term - what should I change?"*) and click **Ask the Analyst**.
 
 ---
 
@@ -122,9 +127,10 @@ A **"Default Portfolio"** is created automatically on first run. `unit_price` is
 ```
 Portfolio-Analyzer/
 ├── public/              # Front end (the only folder served to the browser)
-│   ├── index.html       # Page structure (RTL, Hebrew UI)
+│   ├── index.html       # Page structure
 │   ├── styles.css       # Styling (dark mode)
-│   └── app.js           # Client-side logic: holdings, chart, API calls
+│   ├── i18n.js          # Hebrew / English translations and language switching
+│   └── app.js           # Client-side logic: holdings, charts, API calls
 ├── docs/
 │   └── screenshot.png   # Screenshot used in this README
 ├── data/                # Created at runtime - SQLite database portfolio.db (not committed)
