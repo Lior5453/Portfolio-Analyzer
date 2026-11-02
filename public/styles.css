@@ -164,8 +164,8 @@ tfoot td { font-weight: 600; border-bottom: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 
 /* Chart */
-.chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; }
-/* Title and view buttons always stay on one line */
+/* Title on its own row, view buttons below it, so nothing moves when switching views */
+.chart-head { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
 .chart-head h2 { margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chart-head .toggle { flex: none; }
 .chart-head .toggle button { white-space: nowrap; padding: 6px 8px; font-size: 0.8rem; }

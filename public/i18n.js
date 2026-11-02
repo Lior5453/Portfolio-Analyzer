@@ -44,7 +44,8 @@ const I18N = {
     delete: "מחיקה",
 
     // Allocation chart
-    allocation: "חלוקה",
+    allocationByAsset: "חלוקה לפי נכסים",
+    allocationByType: "חלוקה לפי סוגים",
     chartView: "תצוגת הגרף",
     byAsset: "לפי נכס",
     byType: "לפי סוג",
@@ -140,7 +141,8 @@ const I18N = {
     edit: "Edit",
     delete: "Delete",
 
-    allocation: "Allocation",
+    allocationByAsset: "Asset allocation",
+    allocationByType: "Type allocation",
     chartView: "Chart view",
     byAsset: "By asset",
     byType: "By type",
@@ -149,7 +151,7 @@ const I18N = {
     portfolioValue: "Portfolio value",
     other: "Other",
 
-    comparePerformance: "Returns",
+    comparePerformance: "Compare",
     timeRange: "Time range",
     range1mo: "1 month",
     range6mo: "6 months",
@@ -227,6 +229,26 @@ function t(key, ...args) {
 
 const locale = () => LANGS[currentLang].locale;
 const typeLabel = (type) => TYPE_LABELS[type]?.[currentLang] ?? type;
+
+// Cash holdings have free-text names, usually in Hebrew. In English they are shown with
+// a matching English name; the stored name never changes.
+const CASH_NAMES_EN = {
+  'עו"ש': "ILS cash",
+  "עו״ש": "ILS cash",
+  "עובר ושב": "ILS cash",
+  "מזומן": "ILS cash",
+  "פיקדון": "ILS deposit",
+  "פקדון": "ILS deposit",
+  "חיסכון": "ILS savings",
+  "חסכון": "ILS savings",
+};
+const HEBREW = /[\u0590-\u05FF]/;
+
+// Display name of a holding in the current language
+function holdingName(name, type) {
+  if (currentLang !== "en" || type !== "מזומן" || !HEBREW.test(name)) return name;
+  return CASH_NAMES_EN[name.trim()] ?? "ILS cash";
+}
 
 // Applies the language to the static page: direction, title and every data-i18n element.
 function applyStaticTranslations() {

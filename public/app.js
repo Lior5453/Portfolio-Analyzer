@@ -263,7 +263,9 @@ function slices() {
 // Text shown for a slice: asset types and "Other" are translated, asset names are shown as-is
 function sliceLabel(s) {
   if (s.label === OTHER_SLICE) return t("other");
-  return state.groupBy === "type" ? typeLabel(s.label) : s.label;
+  if (state.groupBy === "type") return typeLabel(s.label);
+  const h = state.holdings.find((x) => x.name === s.label);
+  return h ? holdingName(h.name, h.type) : s.label;
 }
 
 function colorForHolding(h, list) {
@@ -297,7 +299,7 @@ function renderTable() {
         <button type="button" class="icon-btn" data-edit="${h.id}">${t("edit")}</button>
         <button type="button" class="icon-btn delete" data-del="${h.id}">${t("delete")}</button>
       </div></td>`;
-    tr.querySelector(".n").textContent = h.name;
+    tr.querySelector(".n").textContent = holdingName(h.name, h.type);
     tr.querySelector(".t").textContent = typeLabel(h.type);
     tbody.appendChild(tr);
   }
@@ -396,7 +398,8 @@ $("#legend").addEventListener("mouseleave", clearHighlight);
 
 // ---------- View toggle: allocation (by asset / by type) or comparison ----------
 const updateChartTitle = () => {
-  $("#chart-title").textContent = t($("#compare").hidden ? "allocation" : "comparePerformance");
+  const key = !$("#compare").hidden ? "comparePerformance" : state.groupBy === "type" ? "allocationByType" : "allocationByAsset";
+  $("#chart-title").textContent = t(key);
 };
 const viewButtons = document.querySelectorAll(".chart-head .toggle button");
 viewButtons.forEach((btn) => {
@@ -540,7 +543,13 @@ function renderComparison() {
       <span class="val">${money.format(data.start_value * (1 + finals[s.key]))}</span></li>`).join("");
 
   let note = t("compareNote", money.format(data.start_value));
-  if (data.flat_symbols.length) note += t("compareFlat", data.flat_symbols.join(", "));
+  if (data.flat_symbols.length) {
+    const names = data.flat_symbols.map((name) => {
+      const h = state.holdings.find((x) => x.name === name);
+      return h ? holdingName(h.name, h.type) : name;
+    });
+    note += t("compareFlat", names.join(", "));
+  }
   $("#compare-note").textContent = note;
 }
 
