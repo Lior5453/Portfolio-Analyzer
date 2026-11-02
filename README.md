@@ -2,7 +2,7 @@
 
 A web app for tracking and analyzing a personal investment portfolio: enter your holdings, see the allocation in a chart, compare your performance against 100% SPY / QQQM, and ask an analyst powered by **Google Gemini AI** questions about your portfolio. Available in **Hebrew and English**, with amounts in **shekels or dollars**.
 
-![App screenshot](docs/screenshot.png)
+![Portfolio Analyzer - English view with holdings, asset allocation chart and the analyst](docs/screenshot.png)
 
 ---
 
@@ -78,7 +78,7 @@ A web app for tracking and analyzing a personal investment portfolio: enter your
 1. **Add an asset** - enter a symbol (e.g. `AAPL`) and the number of units. The price **and the asset type** (stock, ETF, mutual fund, crypto) are filled in automatically from the market; you can still change them or enter a price manually. For **cash**, choose the "Cash" type: the form switches to a free-text name (e.g. a bank account) and a single **amount** field.
 2. **View the portfolio** - the chart and table update immediately. Switch between the "by asset" and "by type" views, or open **"Compare"** to see how the portfolio did against 100% SPY / QQQM.
 3. **Switch language or currency** - click the Israeli or US flag, or ₪ / $, at the top of the page.
-4. **Ask the analyst** - type a question (e.g. *"I'm 30 and investing long-term - what should I change?"*) and click **Ask the Analyst**.
+4. **Ask the analyst** - type a question (e.g. *"I'm 30, investing long term – what should I change?"*) and click **Ask the Analyst**.
 
 ---
 
