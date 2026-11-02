@@ -86,8 +86,27 @@
         <div class="toggle" role="group" aria-label="קיבוץ הגרף">
           <button type="button" data-group="name" aria-pressed="true">לפי נכס</button>
           <button type="button" data-group="type" aria-pressed="false">לפי סוג</button>
+          <button type="button" data-view="compare" aria-pressed="false">השוואה</button>
         </div>
       </div>
+
+      <!-- Performance comparison: portfolio vs. 100% SPY / 100% QQQM -->
+      <div class="compare" id="compare" hidden>
+        <div class="toggle range-toggle" role="group" aria-label="טווח זמן">
+          <button type="button" data-range="1mo" aria-pressed="false">חודש</button>
+          <button type="button" data-range="6mo" aria-pressed="false">6 חודשים</button>
+          <button type="button" data-range="1y" aria-pressed="true">שנה</button>
+          <button type="button" data-range="5y" aria-pressed="false">5 שנים</button>
+        </div>
+        <p class="compare-summary" id="compare-summary" aria-live="polite"></p>
+        <div class="compare-chart">
+          <svg id="compare-svg" viewBox="0 0 400 230" role="img" aria-label="גרף השוואת תשואות"></svg>
+          <div class="tooltip compare-tooltip" id="compare-tooltip" hidden></div>
+        </div>
+        <ul class="legend" id="compare-legend"></ul>
+        <p class="compare-note" id="compare-note"></p>
+      </div>
+
       <div class="chart-area">
         <svg id="donut" viewBox="0 0 240 240" role="img" aria-label="גרף חלוקת התיק"></svg>
         <div class="donut-center" aria-hidden="true">
@@ -96,7 +115,7 @@
         </div>
         <div class="tooltip" id="tooltip" hidden></div>
       </div>
-      <ul class="legend" id="legend"></ul>
+      <ul class="legend allocation-legend" id="legend"></ul>
     </section>
 
     <!-- Part 3: analyst (Google Gemini) -->

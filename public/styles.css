@@ -173,6 +173,31 @@ tfoot td { font-weight: 600; border-bottom: none; }
 .tooltip strong { display: block; }
 .tooltip span { color: var(--text-secondary); }
 
+[hidden] { display: none !important; }
+
+/* Performance comparison */
+.range-toggle { margin-top: 4px; }
+.range-toggle button { padding: 4px 10px; font-size: 0.8rem; }
+.compare-summary { margin: 12px 0 4px; font-size: 0.92rem; line-height: 1.6; color: var(--text-secondary); min-height: 1.6em; }
+.compare-summary strong { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.compare-chart { position: relative; margin: 4px 0 10px; }
+#compare-svg { width: 100%; height: auto; display: block; direction: ltr; overflow: visible; }
+#compare-svg.loading { opacity: 0.4; }
+#compare-svg .grid-line { stroke: var(--border); stroke-width: 1; }
+#compare-svg .zero-line { stroke: var(--text-muted); stroke-width: 1; }
+#compare-svg .axis-label { fill: var(--text-muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+#compare-svg .end-label { fill: var(--text-secondary); font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
+#compare-svg .cmp-line { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+#compare-svg .crosshair { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; }
+#compare-svg .cmp-dot { stroke: var(--surface-1); stroke-width: 2; }
+#compare-svg .hit-area { fill: transparent; cursor: crosshair; }
+.compare-tooltip { direction: rtl; transform: translateX(calc(-100% - 14px)); }
+.compare-tooltip.flip { transform: translateX(14px); }
+.compare-tooltip .tt-row { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+.compare-tooltip .tt-row b { margin-inline-start: auto; padding-inline-start: 12px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.line-swatch { width: 12px !important; height: 3px !important; border-radius: 2px; }
+.compare-note { margin: 10px 0 0; font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; }
+
 .side-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
 /* Analyst */

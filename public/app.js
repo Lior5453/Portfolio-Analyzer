@@ -210,6 +210,7 @@ function colorForHolding(h, list) {
 function render() {
   renderTable();
   renderChart();
+  if (!$("#compare").hidden) loadComparison(); // holdings changed while the comparison is open
 }
 
 function renderTable() {
@@ -327,12 +328,193 @@ $("#legend").addEventListener("mouseover", (e) => {
 });
 $("#legend").addEventListener("mouseleave", clearHighlight);
 
-// ---------- Grouping toggle ----------
-document.querySelectorAll(".toggle button").forEach((btn) => {
+// ---------- View toggle: allocation (by asset / by type) or comparison ----------
+const viewButtons = document.querySelectorAll(".chart-head .toggle button");
+viewButtons.forEach((btn) => {
   btn.addEventListener("click", () => {
-    state.groupBy = btn.dataset.group;
-    document.querySelectorAll(".toggle button").forEach((b) => b.setAttribute("aria-pressed", b === btn));
-    render();
+    viewButtons.forEach((b) => b.setAttribute("aria-pressed", b === btn));
+    const comparing = btn.dataset.view === "compare";
+    if (!comparing) state.groupBy = btn.dataset.group;
+    $("#chart-title").textContent = comparing ? "השוואת ביצועים" : "חלוקת התיק";
+    $("#compare").hidden = !comparing;
+    $(".chart-area").hidden = comparing;
+    $("#legend").hidden = comparing;
+    comparing ? loadComparison() : render();
+  });
+});
+
+// ---------- Performance comparison (portfolio vs. 100% SPY / QQQM) ----------
+const compareSvg = $("#compare-svg");
+const compareTooltip = $("#compare-tooltip");
+const COMPARE_SERIES = {
+  portfolio: { label: "התיק שלך", color: "var(--series-1)", width: 2.5 },
+  SPY: { label: "100% SPY", color: "var(--series-2)", width: 2 },
+  QQQM: { label: "100% QQQM", color: "var(--series-3)", width: 2 },
+};
+const RANGE_LABELS = { "1mo": "בחודש האחרון", "6mo": "ב-6 החודשים האחרונים", "1y": "בשנה האחרונה", "5y": "ב-5 השנים האחרונות" };
+// Chart geometry (SVG units); the right margin holds the end-of-line labels
+const CMP = { w: 400, h: 230, left: 44, right: 62, top: 12, bottom: 26 };
+
+const compareState = { range: "1y", data: null, cache: {}, seq: 0 };
+// The left-to-right mark keeps the sign in front of the number inside Hebrew text
+const signedPct = (v) => "‎" +(v >= 0 ? "+" : "−") + Math.abs(v * 100).toFixed(1) + "%";
+const shortDate = (t, withYear) =>
+  new Date(t * 1000).toLocaleDateString("he-IL", withYear ? { month: "short", year: "numeric" } : { day: "numeric", month: "short" });
+
+const fullDate = (t) => new Date(t * 1000).toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric" });
+
+// Cached data is reused only while the holdings stay the same
+const holdingsKey = () => JSON.stringify(state.holdings.map((h) => [h.name, h.quantity, h.price]));
+
+async function loadComparison() {
+  const range = compareState.range;
+  const seq = ++compareState.seq;
+  const summary = $("#compare-summary");
+  if (!state.holdings.length) {
+    compareSvg.innerHTML = "";
+    $("#compare-legend").innerHTML = "";
+    $("#compare-note").textContent = "";
+    summary.textContent = "התיק ריק – הוסף נכסים כדי להשוות ביצועים.";
+    return;
+  }
+  const cacheKey = range + holdingsKey();
+  let data = compareState.cache[cacheKey];
+  if (!data) {
+    summary.textContent = "טוען נתוני מחירים היסטוריים…";
+    compareSvg.classList.add("loading");
+    try {
+      data = await api("GET", `/api/compare?range=${range}`);
+      compareState.cache[cacheKey] = data;
+    } catch {
+      if (seq === compareState.seq) summary.textContent = "לא הצלחתי לטעון נתונים היסטוריים כרגע. נסה שוב בעוד רגע.";
+      compareSvg.classList.remove("loading");
+      return;
+    }
+  }
+  if (seq !== compareState.seq) return; // the user switched range meanwhile
+  compareSvg.classList.remove("loading");
+  compareState.data = data;
+  renderComparison();
+}
+
+function renderComparison() {
+  const data = compareState.data;
+  const n = data.times.length;
+  const finals = Object.fromEntries(data.series.map((s) => [s.key, s.returns[n - 1]]));
+
+  // Headline: how the portfolio did vs. each benchmark
+  const mine = finals.portfolio;
+  const verdicts = ["SPY", "QQQM"].map((k) => {
+    const diff = mine - finals[k];
+    const word = Math.abs(diff) < 0.0005 ? "בדיוק כמו" : diff > 0 ? `טוב יותר ב-${Math.abs(diff * 100).toFixed(1)} נק׳ אחוז מ` : `פחות טוב ב-${Math.abs(diff * 100).toFixed(1)} נק׳ אחוז מ`;
+    return `${word}-${k}`;
+  });
+  $("#compare-summary").innerHTML =
+    `${RANGE_LABELS[data.range]} התיק שלך השיג <strong>${signedPct(mine)}</strong> – ${verdicts.join(", ")}.`;
+
+  // Scales
+  const all = data.series.flatMap((s) => s.returns);
+  let lo = Math.min(0, ...all), hi = Math.max(0, ...all);
+  const pad = (hi - lo) * 0.08 || 0.01;
+  lo -= pad; hi += pad;
+  const plotW = CMP.w - CMP.left - CMP.right, plotH = CMP.h - CMP.top - CMP.bottom;
+  const x = (i) => CMP.left + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2);
+  const y = (v) => CMP.top + (1 - (v - lo) / (hi - lo)) * plotH;
+
+  // "Nice" gridline step: 1, 2 or 5 × 10^k, about 4 lines
+  const raw = (hi - lo) / 4;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+  let out = "";
+  for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+    const isZero = Math.abs(v) < step / 2;
+    out += `<line class="${isZero ? "zero-line" : "grid-line"}" x1="${CMP.left}" x2="${CMP.left + plotW}" y1="${y(v)}" y2="${y(v)}"/>`;
+    out += `<text class="axis-label" x="${CMP.left - 6}" y="${y(v) + 3.5}" text-anchor="end">${isZero ? "0%" : signedPct(v).replace(".0%", "%")}</text>`;
+  }
+  // X axis: start, middle, end dates
+  const withYear = data.range === "1y" || data.range === "5y";
+  [0, Math.floor((n - 1) / 2), n - 1].forEach((i, k) => {
+    const anchor = ["start", "middle", "end"][k];
+    out += `<text class="axis-label" x="${x(i)}" y="${CMP.h - 8}" text-anchor="${anchor}">${shortDate(data.times[i], withYear)}</text>`;
+  });
+
+  // Lines (portfolio drawn last, so it sits on top)
+  const order = [...data.series].sort((a, b) => (a.key === "portfolio") - (b.key === "portfolio"));
+  for (const s of order) {
+    const st = COMPARE_SERIES[s.key];
+    const d = s.returns.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+    out += `<path class="cmp-line" d="${d}" stroke="${st.color}" stroke-width="${st.width}"/>`;
+  }
+
+  // End-of-line labels, nudged apart so they never overlap
+  const ends = data.series.map((s) => ({ key: s.key, y: y(finals[s.key]) })).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) ends[i].y = Math.max(ends[i].y, ends[i - 1].y + 14);
+  for (const e of ends) {
+    const name = e.key === "portfolio" ? "התיק" : e.key;
+    out += `<text class="end-label" x="${CMP.left + plotW + 6}" y="${e.y + 4}">${name} ${signedPct(finals[e.key])}</text>`;
+  }
+
+  // Hover layer: crosshair + one dot per line
+  out += `<line class="crosshair" id="cmp-cross" y1="${CMP.top}" y2="${CMP.top + plotH}" visibility="hidden"/>`;
+  data.series.forEach((s) => {
+    out += `<circle class="cmp-dot" data-key="${s.key}" r="4" fill="${COMPARE_SERIES[s.key].color}" visibility="hidden"/>`;
+  });
+  out += `<rect class="hit-area" x="${CMP.left}" y="${CMP.top}" width="${plotW}" height="${plotH}"/>`;
+  compareSvg.innerHTML = out;
+  compareState.geo = { x, y, n, plotW };
+
+  // Legend (always present, so identity never relies on color alone)
+  $("#compare-legend").innerHTML = data.series.map((s) => `
+    <li><span class="swatch line-swatch" style="background:${COMPARE_SERIES[s.key].color}"></span>
+      <span class="label">${COMPARE_SERIES[s.key].label}</span>
+      <span class="pct">${signedPct(finals[s.key])}</span>
+      <span class="val">${money.format(data.start_value * (1 + finals[s.key]))}</span></li>`).join("");
+
+  let note = `ההשוואה מניחה שהתיק הנוכחי הוחזק לאורך כל התקופה, ושאותו סכום (${money.format(data.start_value)}) הושקע כולו ב-SPY או ב-QQQM. כולל דיבידנדים ושער הדולר, בשקלים.`;
+  if (data.flat_symbols.length) note += ` ללא נתונים היסטוריים, נחשבו בערך קבוע: ${data.flat_symbols.join(", ")}.`;
+  $("#compare-note").textContent = note;
+}
+
+function compareHover(evt) {
+  const g = compareState.geo, data = compareState.data;
+  if (!g || !data) return;
+  const box = compareSvg.getBoundingClientRect();
+  const svgX = ((evt.clientX - box.left) / box.width) * CMP.w;
+  const i = Math.max(0, Math.min(g.n - 1, Math.round(((svgX - CMP.left) / g.plotW) * (g.n - 1))));
+  const cross = $("#cmp-cross");
+  cross.setAttribute("x1", g.x(i)); cross.setAttribute("x2", g.x(i)); cross.setAttribute("visibility", "visible");
+  compareSvg.querySelectorAll(".cmp-dot").forEach((dot) => {
+    const s = data.series.find((s) => s.key === dot.dataset.key);
+    dot.setAttribute("cx", g.x(i)); dot.setAttribute("cy", g.y(s.returns[i])); dot.setAttribute("visibility", "visible");
+  });
+  const rows = [...data.series]
+    .sort((a, b) => b.returns[i] - a.returns[i])
+    .map((s) => `<div class="tt-row"><span class="swatch line-swatch" style="background:${COMPARE_SERIES[s.key].color}"></span>${COMPARE_SERIES[s.key].label}<b>${signedPct(s.returns[i])}</b></div>`)
+    .join("");
+  compareTooltip.innerHTML = `<strong>${fullDate(data.times[i])}</strong>${rows}`;
+  compareTooltip.hidden = false;
+  // Keep the tooltip inside the chart: show it on the side away from the cursor
+  const px = (g.x(i) / CMP.w) * box.width;
+  compareTooltip.style.left = px + "px";
+  compareTooltip.style.top = "8px";
+  compareTooltip.classList.toggle("flip", px < box.width / 2);
+}
+
+function compareLeave() {
+  compareTooltip.hidden = true;
+  const cross = $("#cmp-cross");
+  if (cross) cross.setAttribute("visibility", "hidden");
+  compareSvg.querySelectorAll(".cmp-dot").forEach((d) => d.setAttribute("visibility", "hidden"));
+}
+
+compareSvg.addEventListener("mousemove", compareHover);
+compareSvg.addEventListener("mouseleave", compareLeave);
+
+document.querySelectorAll(".range-toggle button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".range-toggle button").forEach((b) => b.setAttribute("aria-pressed", b === btn));
+    compareState.range = btn.dataset.range;
+    loadComparison();
   });
 });
 

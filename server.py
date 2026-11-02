@@ -3,6 +3,7 @@
 Serves the site's static files (public/) and adds API endpoints:
   GET    /api/status               whether the analyst (Gemini API key) is available
   GET    /api/quote?symbol=AAPL    current market price (Yahoo Finance) and the price in ILS
+  GET    /api/compare?range=1y     portfolio performance vs. 100% SPY / 100% QQQM (1mo, 6mo, 1y, 5y)
   GET    /api/portfolio            the default portfolio and its holdings
   POST   /api/holdings             add a holding
   PUT    /api/holdings/<id>        update a holding
@@ -411,6 +412,124 @@ def quote(symbol):
     }
 
 
+# ---------- Historical comparison (portfolio vs. benchmarks) ----------
+BENCHMARKS = ["SPY", "QQQM"]
+# range key -> Yahoo "interval" (weekly points keep the 5-year chart light)
+COMPARE_RANGES = {"1mo": "1d", "6mo": "1d", "1y": "1d", "5y": "1wk"}
+HISTORY_CACHE_SECONDS = 600
+_history_cache = {}  # (symbol, range) -> (time, data)
+
+
+def fetch_history(symbol, range_key):
+    """Returns {"times": [...], "prices": [...], "currency": str} from Yahoo, or None if not found.
+
+    Uses dividend-adjusted closes when available, so returns include dividends (total return).
+    Prices are in the asset's own currency (agorot are converted to shekels).
+    """
+    cache_key = (symbol, range_key)
+    now = time.time()
+    hit = _history_cache.get(cache_key)
+    if hit and now - hit[0] < HISTORY_CACHE_SECONDS:
+        return hit[1]
+
+    query = urllib.parse.urlencode({"range": range_key, "interval": COMPARE_RANGES[range_key]})
+    url = YAHOO_URL.format(urllib.parse.quote(symbol)) + "?" + query
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            result = json.load(r)["chart"]["result"]
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None
+        raise
+
+    data = None
+    if result and result[0].get("timestamp"):
+        chart = result[0]
+        indicators = chart.get("indicators", {})
+        adjusted = (indicators.get("adjclose") or [{}])[0].get("adjclose")
+        closes = adjusted or (indicators.get("quote") or [{}])[0].get("close") or []
+        currency = (chart["meta"].get("currency") or "USD").upper()
+        scale = 0.01 if currency == "ILA" else 1.0
+        points = [(t, p * scale) for t, p in zip(chart["timestamp"], closes) if p is not None]
+        if points:
+            data = {
+                "times": [t for t, _ in points],
+                "prices": [p for _, p in points],
+                "currency": "ILS" if currency == "ILA" else currency,
+            }
+    _history_cache[cache_key] = (now, data)
+    return data
+
+
+def values_on_grid(times, values, grid):
+    """Aligns a time series to the grid: each grid time takes the last known value at or before it.
+
+    Grid times before the first data point take the first value (the asset is treated as flat).
+    """
+    out, j = [], 0
+    for t in grid:
+        while j + 1 < len(times) and times[j + 1] <= t:
+            j += 1
+        out.append(values[j])
+    return out
+
+
+def history_in_ils(symbol, range_key, grid):
+    """Returns the asset's price in ILS for every grid time, or None if Yahoo has no history for it."""
+    history = fetch_history(symbol, range_key)
+    if not history:
+        return None
+    prices = values_on_grid(history["times"], history["prices"], grid)
+    if history["currency"] != "ILS":
+        fx = fetch_history(f"{history['currency']}ILS=X", range_key)
+        if not fx:
+            raise RuntimeError(f"no exchange rate history for {history['currency']}")
+        rates = values_on_grid(fx["times"], fx["prices"], grid)
+        prices = [p * r for p, r in zip(prices, rates)]
+    return prices
+
+
+def compare_portfolio(holdings, range_key):
+    """Compares the current portfolio, held over the whole period, with 100% in each benchmark.
+
+    All values are in ILS. Returns cumulative returns (0.05 = +5%) per grid time.
+    Holdings with no Yahoo history (e.g. cash or manual assets) keep a constant value.
+    """
+    # The first benchmark's trading days form the shared time grid.
+    base = fetch_history(BENCHMARKS[0], range_key)
+    if not base:
+        raise RuntimeError("no benchmark history")
+    grid = base["times"]
+
+    portfolio_values = [0.0] * len(grid)
+    flat_symbols = []
+    for h in holdings:
+        prices = history_in_ils(h["symbol"], range_key, grid)
+        if prices is None:
+            prices = [h["unit_price"]] * len(grid)
+            flat_symbols.append(h["symbol"])
+        for i, p in enumerate(prices):
+            portfolio_values[i] += h["quantity"] * p
+
+    def cumulative_returns(values):
+        start = values[0]
+        return [round(v / start - 1, 6) if start else 0.0 for v in values]
+
+    series = [{"key": "portfolio", "returns": cumulative_returns(portfolio_values)}]
+    for symbol in BENCHMARKS:
+        series.append({"key": symbol, "returns": cumulative_returns(history_in_ils(symbol, range_key, grid))})
+
+    return {
+        "range": range_key,
+        "times": grid,
+        "series": series,
+        "start_value": round(portfolio_values[0], 2),
+        "end_value": round(portfolio_values[-1], 2),
+        "flat_symbols": flat_symbols,
+    }
+
+
 # ======================================================================
 # HTTP handler
 # ======================================================================
@@ -471,6 +590,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(200, {"messages": get_recent_messages(limit), "context_turns": CONTEXT_TURNS})
         if path == "/api/quote":
             return self.handle_quote(parsed)
+        if path == "/api/compare":
+            return self.handle_compare(parsed)
         self.send_json(404, {"error": "not found"})
 
     def api_post(self, parsed):
@@ -522,6 +643,20 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(502, {"error": str(e)})
         if not data:
             return self.send_json(404, {"error": "not found"})
+        self.send_json(200, data)
+
+    def handle_compare(self, parsed):
+        range_key = urllib.parse.parse_qs(parsed.query).get("range", ["1y"])[0]
+        if range_key not in COMPARE_RANGES:
+            raise BadRequest(f"range must be one of: {', '.join(COMPARE_RANGES)}")
+        holdings = list_holdings()
+        if not holdings:
+            return self.send_json(409, {"error": "empty_portfolio"})
+        try:
+            data = compare_portfolio(holdings, range_key)
+        except Exception as e:  # network / data source error
+            print(f"[compare] failed: {type(e).__name__}: {e}")
+            return self.send_json(502, {"error": "data_unavailable"})
         self.send_json(200, data)
 
     def handle_analyze(self):
