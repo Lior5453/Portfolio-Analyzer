@@ -66,11 +66,14 @@ const total = () => state.holdings.reduce((s, h) => s + valueOf(h), 0);
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   const data = new FormData(form);
+  const cash = isCash();
   const holding = {
-    name: data.get("name").trim().toUpperCase(),
+    // Cash names are free text (e.g. a bank account), so they keep their original case
+    name: cash ? data.get("name").trim() : data.get("name").trim().toUpperCase(),
     type: data.get("type"),
-    quantity: parseFloat(data.get("quantity")),
-    price: parseFloat(data.get("price")),
+    // Cash is stored as quantity = amount, unit price = ₪1
+    quantity: parseFloat(data.get(cash ? "amount" : "quantity")),
+    price: cash ? 1 : parseFloat(data.get("price")),
   };
   if (!holding.name || !(holding.quantity >= 0) || !(holding.price >= 0)) return;
 
@@ -104,11 +107,48 @@ function setQuoteStatus(text, kind = "") {
   quoteStatus.className = "quote-status" + (kind ? " " + kind : "");
 }
 
+// ---------- Asset type ----------
+const CASH_TYPE = "מזומן";
+// Yahoo's asset class -> the matching option in the asset-type list
+const TYPE_BY_INSTRUMENT = {
+  EQUITY: "מניות",
+  ETF: "קרן סל",
+  MUTUALFUND: "קרן נאמנות",
+  CRYPTOCURRENCY: "קריפטו",
+};
+
+const isCash = () => form.type.value === CASH_TYPE;
+
+// Cash gets a name + amount; every other type gets symbol + quantity + unit price
+function applyTypeMode() {
+  const cash = isCash();
+  $("#amount-field").hidden = !cash;
+  $("#units-row").hidden = cash;
+  form.amount.required = cash;
+  form.quantity.required = !cash;
+  form.price.required = !cash;
+  $("#name-label").textContent = cash ? "שם" : "שם הנכס / סימול";
+  form.name.placeholder = cash ? "לדוגמה: עו״ש, פיקדון, מזומן בדולרים" : "לדוגמה: AAPL, TEVA.TA, BTC-USD";
+  form.name.dir = cash ? "auto" : "ltr";
+  if (cash) {
+    // No market lookup for cash
+    clearTimeout(quoteTimer);
+    quoteTimer = null;
+    quoteSeq++;
+    setQuoteStatus("");
+  }
+}
+
+form.type.addEventListener("change", () => {
+  form.type.classList.remove("auto-filled");
+  applyTypeMode();
+});
+
 async function lookupPrice() {
   const symbol = form.name.value.trim();
   const seq = ++quoteSeq;
   form.price.classList.remove("auto-filled");
-  if (!symbol) { setQuoteStatus(""); return; }
+  if (!symbol || isCash()) { setQuoteStatus(""); return; }
 
   setQuoteStatus("מחפש מחיר עדכני…");
   try {
@@ -121,9 +161,15 @@ async function lookupPrice() {
 
     form.price.value = +q.priceILS.toFixed(2);
     form.price.classList.add("auto-filled");
+    // Pre-select the asset type from Yahoo's classification (the user can still change it)
+    const detectedType = TYPE_BY_INSTRUMENT[q.instrumentType];
+    if (detectedType) {
+      form.type.value = detectedType;
+      form.type.classList.add("auto-filled");
+    }
     const original = q.currency === "ILS" ? "" :
       ` (${new Intl.NumberFormat("he-IL", { style: "currency", currency: q.currency }).format(q.price)})`;
-    setQuoteStatus(`${q.name}: ${money2.format(q.priceILS)}${original}`, "ok");
+    setQuoteStatus(`${q.name}: ${money2.format(q.priceILS)}${original}${detectedType ? ` · ${detectedType}` : ""}`, "ok");
   } catch {
     if (seq === quoteSeq) setQuoteStatus("לא הצלחתי למשוך מחיר כרגע – אפשר להזין ידנית", "error");
   }
@@ -145,9 +191,11 @@ function resetForm() {
   quoteSeq++;
   setQuoteStatus("");
   form.price.classList.remove("auto-filled");
+  form.type.classList.remove("auto-filled");
   state.editingId = null;
   $("#submit-btn").textContent = "הוסף לתיק";
   $("#cancel-edit").hidden = true;
+  applyTypeMode();
 }
 
 function startEdit(id) {
@@ -156,8 +204,11 @@ function startEdit(id) {
   state.editingId = id;
   form.name.value = h.name;
   form.type.value = h.type;
+  form.type.classList.remove("auto-filled");
+  applyTypeMode();
   form.quantity.value = h.quantity;
   form.price.value = h.price;
+  form.amount.value = +(h.quantity * h.price).toFixed(2);
   $("#submit-btn").textContent = "שמור שינויים";
   $("#cancel-edit").hidden = false;
   form.name.focus();

@@ -18,7 +18,7 @@
       <h2 id="form-title">הוספת נכס</h2>
       <form id="holding-form" autocomplete="off">
         <div class="field">
-          <label for="name">שם הנכס / סימול</label>
+          <label for="name" id="name-label">שם הנכס / סימול</label>
           <input id="name" name="name" required placeholder="לדוגמה: AAPL, TEVA.TA, BTC-USD" dir="ltr">
           <p class="quote-status" id="quote-status" aria-live="polite"></p>
         </div>
@@ -34,7 +34,12 @@
             <option>אחר</option>
           </select>
         </div>
-        <div class="row">
+        <!-- Cash: a single amount instead of quantity × price -->
+        <div class="field" id="amount-field" hidden>
+          <label for="amount">סכום (₪)</label>
+          <input id="amount" name="amount" type="number" min="0" step="any" placeholder="50000">
+        </div>
+        <div class="row" id="units-row">
           <div class="field">
             <label for="quantity">כמות יחידות</label>
             <input id="quantity" name="quantity" type="number" min="0" step="any" required placeholder="10">

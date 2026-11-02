@@ -113,7 +113,7 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
 .quote-status.ok { color: var(--text-secondary); }
 .quote-status.ok::before { content: "✓ "; color: var(--series-3); font-weight: 700; }
 .quote-status.error::before { content: "⚠ "; color: var(--danger); }
-input.auto-filled { border-color: var(--series-3); }
+input.auto-filled, select.auto-filled { border-color: var(--series-3); }
 button { font: inherit; cursor: pointer; border-radius: 8px; }
 .btn-primary {
   background: var(--accent); color: var(--accent-text);

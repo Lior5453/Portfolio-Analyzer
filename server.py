@@ -34,6 +34,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(HERE, "public")  # only this folder is served to the browser
 DB_PATH = os.path.join(HERE, "data", "portfolio.db")
 DEFAULT_PORTFOLIO_NAME = "Default Portfolio"
+CASH_ASSET_TYPE = "מזומן"  # the "cash" option value used by the UI's asset-type list
 
 # Context window: only the last CONTEXT_TURNS turns are sent to Gemini.
 # One turn = one user message + the assistant's reply. The full history stays in the database.
@@ -152,8 +153,10 @@ def validate_holding(data):
     """Validates and normalizes holding fields from a request body. Raises ValueError on bad input."""
     if not isinstance(data, dict):
         raise ValueError("holding must be an object")
-    symbol = str(data.get("symbol", "")).strip().upper()[:60]
     asset_type = str(data.get("asset_type", "")).strip()[:30]
+    symbol = str(data.get("symbol", "")).strip()[:60]
+    if asset_type != CASH_ASSET_TYPE:
+        symbol = symbol.upper()  # market symbols are uppercase; cash names are free text
     try:
         quantity = float(data.get("quantity"))
         unit_price = float(data.get("unit_price", 0) or 0)
@@ -409,6 +412,8 @@ def quote(symbol):
         "price": round(price, 4),
         "currency": currency,
         "priceILS": round(price_ils, 4),
+        # Yahoo's asset class, e.g. EQUITY, ETF, MUTUALFUND, CRYPTOCURRENCY (used to pre-select the asset type)
+        "instrumentType": meta.get("instrumentType"),
     }
 
 
